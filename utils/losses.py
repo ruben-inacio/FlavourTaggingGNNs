@@ -28,3 +28,12 @@ def squared_error(targets, predictions, mean=True):
         return errors.mean()
     return errors
 
+
+def gaussian_neg_loglikelihood(targets, predictions, errors, mean=True, eps=1e-6):
+    errors = max(errors, eps)
+    loss = 0.5 * (jnp.log(errors) + jnp.square(predictions - targets) / errors)
+
+    if mean:
+        return loss.mean()
+    
+    return loss

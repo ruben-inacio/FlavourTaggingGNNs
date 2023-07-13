@@ -30,7 +30,7 @@ class EncoderLayer(nn.Module):
 
     def setup(self):
         self.weights = None
-        self.attn = nn.SelfAttention(num_heads=self.heads)
+        self.attn = nn.MultiHeadDotProductAttention(num_heads=self.heads)
         self.norm1 = nn.LayerNorm()
         self.lin1 = nn.Dense(features=4*self.hidden_channels)
 
@@ -38,8 +38,8 @@ class EncoderLayer(nn.Module):
         self.lin2 = nn.Dense(features=self.hidden_channels)
         self.fwd_fn = eval("self.fwd_" + self.architecture)
     
-    def fwd_post(self, x):
-        n = self.attn(x)
+    def fwd_post(self, x, y):
+        n = self.attn(x, y)
         x = x + n
         x = self.norm1(x)
         n = self.lin1(x)
@@ -63,8 +63,8 @@ class EncoderLayer(nn.Module):
     def fwd_postb2t(self, x):
         pass
 
-    def __call__(self, x, mask=None):
-        x = self.fwd_fn(x)
+    def __call__(self, x, y, mask=None):
+        x = self.fwd_fn(x, y)
         return x
 
 
@@ -85,7 +85,7 @@ class Encoder(nn.Module):
 
     def __call__(self, g, mask=None):
         for i in range(self.layers):
-            g = getattr(self, f"enc_layer_{i}")(g, mask=mask)
+            g = getattr(self, f"enc_layer_{i}")(g, g, mask=mask)
 
         if mask is not None:
             g = g * mask

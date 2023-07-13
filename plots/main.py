@@ -100,25 +100,34 @@ if __name__ == "__main__":
             try:
                 results_graph_clf = np.load(f"{m}/results_graph_clf_{run}.npy")
                 assert(results_graph_clf.shape[0] == true_graph.shape[0])
-
-                results_nodes_clf = np.load(f"{m}/results_nodes_clf_{run}.npy")
-                results_nodes_clf = results_nodes_clf.reshape(-1, 4)[valid_nodes]
-                assert(results_nodes_clf.shape[0] == true_nodes.shape[0])
-
-                results_edges_clf = np.load(f"{m}/results_edges_clf_{run}.npy")
-                if results_edges_clf.ndim == 3 and results_edges_clf.shape[-1] != 2:
-                    results_edges_clf = results_edges_clf.reshape(-1, 1)[valid_edges]
-                    results_edges_clf = np.concatenate([1 - results_edges_clf, results_edges_clf], axis=1)
-                assert(results_edges_clf.shape[0] == true_edges.shape[0])
-
                 predictions_graph_clf[-1].append(results_graph_clf)
-                predictions_nodes_clf[-1].append(results_nodes_clf)
-                predictions_edges_clf[-1].append(results_edges_clf)
 
             except Exception as e:
                 print("ATLAS ROC, classification plots disabled.")
                 do_jet_roc = False
                 do_classifications = False
+            
+            try:
+                results_nodes_clf = np.load(f"{m}/results_nodes_clf_{run}.npy")
+                results_nodes_clf = results_nodes_clf.reshape(-1, 4)
+                if true_nodes.shape[0] < result_nodes_clf.shape[0]:
+                    result_nodes_clf = result_nodes_clf[valid_nodes]
+                assert(results_nodes_clf.shape[0] == true_nodes.shape[0])
+
+                results_edges_clf = np.load(f"{m}/results_edges_clf_{run}.npy")
+                if results_edges_clf.ndim == 3 and results_edges_clf.shape[-1] != 2:
+                    results_edges_clf = results_edges_clf.reshape(-1, 1)
+                    if true_edges.shape[0] < results_edges_clf.shape[0]:
+                        results_edges_clf = results_edges_clf[valid_edges]
+                    results_edges_clf = np.concatenate([1 - results_edges_clf, results_edges_clf], axis=1)
+                assert(results_edges_clf.shape[0] == true_edges.shape[0])
+
+                predictions_nodes_clf[-1].append(results_nodes_clf)
+                predictions_edges_clf[-1].append(results_edges_clf)
+            except Exception as e:
+                print("Classification plots disabled.")
+                do_classifications = False
+
 
     labels = settings['labels_models']
     if do_regression:
@@ -129,7 +138,7 @@ if __name__ == "__main__":
         # performance_regression(labels, predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts)
         # performance_regression(labels, predictions_fitting, predictions_errors, true_vtx, true_graph, jet_trks)
 
-    if do_jet_roc and False:
+    if do_jet_roc:
         performance_roc_jets(predictions_graph_clf, true_graph, labels)
 
     if do_classifications:

@@ -128,7 +128,7 @@ def prepare_ROC_jet_ATLAS_bcujets(pred, true, f=0.05, rej_threshold=100.0):
     return (sig_eff[valid_sig], cbkg_rej[valid_sig], ubkg_rej[valid_sig])
 
 
-def compare_models_jet_ATLAS(jet_results, colors, save_dir):
+def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
     fig, ax = plt.subplots(2,figsize=(8,8),gridspec_kw={'height_ratios': [2, 1]})
 
     # Upper panel (ROC)
@@ -246,6 +246,6 @@ def performance_roc_jets(predictions, true_flavours, labels):
         settings = json.load(f)
         results_dir = settings['results_dir']
         colors = settings['colors']
-    
-    compare_models_jet_ATLAS(results, colors, results_dir)
+
+    compare_models_jet_ATLAS(results, colors, results_dir, labels)
 

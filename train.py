@@ -39,7 +39,7 @@ import pickle
 # GLOBAL SETTINGS
 LR_INIT = 1e-3
 N_FEATURES = 18  # DO NOT CHANGE, TO BE REMOVED
-N_JETS = 2500 
+N_JETS = 250 #0 
 N_TRACKS = 15
 DEFAULT_DIR = "/lstore/titan/miochoa/TrackGeometry2023/RachelDatasets_Jun2023/all_flavors/all_flavors" 
 DEFAULT_SUFFIX =  "alljets_fitting"
@@ -71,9 +71,10 @@ def get_batch(x, y):
     return batch
 
 
-def get_model(model_type, save_dir=None):
-    with open("configs_models.json", "r") as f:
-        settings = json.load(f)[model_type]
+def get_model(model_type, save_dir=None, settings=None):
+    if settings is None:
+        with open("configs_models.json", "r") as f:
+            settings = json.load(f)[model_type]
     if model_type == "predictor":
         model = Predictor(**settings)
     elif model_type == "complete":
@@ -310,13 +311,7 @@ def parse_args():
     parser.add_argument('-dev', default=False, type=bool, help="Set to True to check dimensions etc")
     parser.add_argument('-save_plot_data', default=False, type=bool, help="Save final results for plotting?")
     parser.add_argument('-model', type=str)
-    # Hyperparameters
-    parser.add_argument('-hidden_channels', default=64, type=int)
-    parser.add_argument('-layers', default=3, type=int)
-    parser.add_argument('-heads', default=8, type=int)
-    parser.add_argument('-augment', default=False, type=bool)
     parser.add_argument('-name', default="test", type=str)
-    parser.add_argument('-strategy_prediction', default=None, type=str)
 
     return parser.parse_args()
 
@@ -369,7 +364,8 @@ if __name__ == "__main__":
     else:
         train_dl = torch.load("%s/train_dl.pth"%(opt.input_dir)) # '../training_data/validate_dl.pth'
         valid_dl = torch.load("%s/validate_dl.pth"%(opt.input_dir)) # '../training_data/validate_dl.pth'
-        test_dl = torch.load("%s/test_dl.pth"%(opt.input_dir))
+        if opt.save_plot_data:
+            test_dl = torch.load("%s/test_dl.pth"%(opt.input_dir))
     
     print("Loading datasets: end")
     save_dir = opt.save_dir + "/" + opt.name
@@ -388,6 +384,6 @@ if __name__ == "__main__":
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
         state = ckpt['model']
         if opt.save_plot_data:
-            pass
+            store_predictions(model, params, test_dl, save_dir, save_truth=False)
             # store_predictions(state.params, test_dl, save_dir, ensemble_id=instance_id)
 
