@@ -1,0 +1,393 @@
+import os
+os.environ[ 'MPLCONFIGDIR' ] = '/tmp/$USER/'
+import datetime
+import subprocess  # to check if running at lipml
+host = str(subprocess.check_output(['hostname']))
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+if "lipml" in host:
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1" # "1"  # "0"
+
+import jax
+import functools
+from sklearn.preprocessing import StandardScaler
+import jax.numpy as jnp
+from typing import Any, Callable, Sequence
+from jax import lax, random, numpy as jnp
+from flax.core import freeze, unfreeze
+from flax import linen as nn  
+from jax.config import config
+from flax.training import train_state, checkpoints
+from flax.training.early_stopping import EarlyStopping
+config.update("jax_enable_x64", True)
+config.update("jax_debug_nans", False)
+
+import optax       
+# from jax_models import TN1, mask_tracks, Predictor
+from models.Predictor import Predictor
+from models.GN2Plus import TN1
+from utils.layers import *
+
+import numpy as np
+import argparse
+import torch
+from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader
+import json
+import pickle
+
+# GLOBAL SETTINGS
+LR_INIT = 1e-3
+N_FEATURES = 18  # DO NOT CHANGE, TO BE REMOVED
+N_JETS = 2500 
+N_TRACKS = 15
+DEFAULT_DIR = "/lstore/titan/miochoa/TrackGeometry2023/RachelDatasets_Jun2023/all_flavors/all_flavors" 
+DEFAULT_SUFFIX =  "alljets_fitting"
+DEFAULT_MODEL_DIR = "../models" 
+
+
+def get_batch(x, y):
+    # c_jets = y[:, 0, 19] == 1
+    # y = y[c_jets]
+    # x = x[c_jets]
+
+    batch = {}
+    batch['x'] = jnp.concatenate((x[:, :, :16], x[:, :, 26:28]),axis=2)
+
+    # ids = jnp.identity(15).reshape(1, 15, 15)
+    # ids = ids.repeat(2500, axis=0)
+    # batch['x'] = jnp.concatenate([batch['x'], ids], axis=2)
+    # Extra args
+    batch['n_tracks'] = x[:, 0, 22]
+    batch['jet_phi'] = x[:, 0, 24]
+    batch['jet_theta'] = x[:, 0, 25]
+
+    batch['jet_y'] = y[:, 0, 18:21]
+    batch['trk_y'] = y[:, :, 21:25]
+    batch['edge_y'] = jax.nn.one_hot(y[:, :, 3:18].reshape(-1, 225), 2, axis=2)
+    batch['trk_vtx'] = x[:, :, 16:19]
+    batch['jet_vtx'] = x[:, 0, 19:22]
+    batch['y'] = y  
+    return batch
+
+
+def get_model(model_type, save_dir=None):
+    with open("configs_models.json", "r") as f:
+        settings = json.load(f)[model_type]
+    if model_type == "predictor":
+        model = Predictor(**settings)
+    elif model_type == "complete":
+        model = TN1(**settings)
+    # model = NDIVE() # 
+    if save_dir is not None:
+        with open(save_dir + "/config.json", "w") as f:
+            json_object = json.dumps(settings, indent=4)
+            f.write(json_object)
+    return model
+
+
+def get_init_input():
+    x = jnp.ones([N_JETS, N_TRACKS, 18]) * 2.0
+    batch = jnp.array(list(range(N_JETS))).repeat(N_TRACKS)
+    mask, mask_edges = mask_tracks(x, jnp.ones(x.shape[0]) * 15)
+    jet_vtx = jnp.ones([N_JETS, 3])
+    trk_vtx = jnp.ones([N_JETS, N_TRACKS, 3])
+    return x, batch, mask, jet_vtx, trk_vtx
+
+
+def create_train_state(rng, learning_rate, params=None):
+    if params is None:  # Initialise the model
+        x, batch, mask, jet_vtx, trk_vtx = get_init_input()
+        params = model.init(rng, x, mask, jet_vtx, trk_vtx, x[:, 0, 1], x[:, 0, 1],x[:, 0, 1])['params']
+    tx = optax.adam(learning_rate=learning_rate)
+    print("CREATING TRAIN STATE WITH LR =", learning_rate)
+
+    return train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx)
+
+
+@jax.jit
+def train_step(state, batch, key):
+    def loss_fn(params):
+        out = model.apply(
+            {'params': params}, 
+            batch['x'], 
+            mask, 
+            batch['jet_vtx'], 
+            batch['trk_vtx'],
+            batch['n_tracks'],
+            batch['jet_phi'],
+            batch['jet_theta'],
+        )
+        return model.loss(out, batch, mask, mask_edges)
+        
+    mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+
+    # idx = jax.random.permutation(key, 15)
+    # batch['x'] = batch['x'][:, idx]
+    # batch['trk_y'] = batch['trk_y'][:, idx]
+    # batch['edge_y'] = batch['edge_y'].reshape(2500, 15, 15, 2)[:, idx, :, :].reshape(2500, 225, 2)
+    # batch['trk_vtx'] = batch['trk_vtx'][:, idx]
+    # batch['jet_vtx'] = batch['jet_vtx'][:, idx]
+    # # batch['y'] = batch['y'][:, idx]  
+    # mask = mask[:, idx]
+    # mask_edges = mask_edges[:, idx, :]
+    # mask_edges = mask_edges[:, :, idx]
+
+    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+    (loss, loss_tasks), grads = grad_fn(state.params)
+    state = state.apply_gradients(grads=grads)
+
+    return state, loss, loss_tasks
+
+
+@jax.jit
+def eval_step(params, batch, key):
+    batch_idx = jnp.array(list(range(N_JETS))).repeat(15)
+
+    mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+
+    # idx = jax.random.permutation(key, 15)
+    # batch['x'] = batch['x'][:, idx]
+    # batch['trk_y'] = batch['trk_y'][:, idx]
+    # batch['edge_y'] = batch['edge_y'].reshape(2500, 15, 15, 2)[:, idx, :, :].reshape(2500, 225, 2)
+    # batch['trk_vtx'] = batch['trk_vtx'][:, idx]
+    # batch['jet_vtx'] = batch['jet_vtx'][:, idx]
+    # # batch['y'] = batch['y'][:, idx]  
+    # mask = mask[:, idx]
+
+    # mask_edges = mask_edges[:, idx, :]
+    # mask_edges = mask_edges[:, :, idx]
+
+    out = model.apply(
+        {'params': params}, 
+        batch['x'], 
+        mask, 
+        batch['jet_vtx'], 
+        batch['trk_vtx'],
+        batch['n_tracks'],
+        batch['jet_phi'],
+        batch['jet_theta'],
+    )
+    return model.loss(out, batch, mask, mask_edges)
+
+
+@jax.jit
+def test_step(params, batch):
+    batch_idx = jnp.array(list(range(N_JETS))).repeat(15)
+
+    mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+    return model.apply(
+        {'params': params}, 
+        batch['x'], 
+        mask, 
+        batch['jet_vtx'], 
+        batch['trk_vtx'],
+        batch['n_tracks'],
+        batch['jet_phi'],
+        batch['jet_theta'],
+    )[:6]
+
+
+def train_epoch(state, dl, epoch, key, training): 
+    running_loss = []
+    running_loss_aux = [[], [], [], []]
+    dl.pin_memory_device = []
+
+    for i, dd in enumerate(dl):
+        for j in range(dd.x.shape[0] // N_JETS):
+            x = dd.x[N_JETS*j:N_JETS*(j+1), :, :]
+            y = dd.y[N_JETS*j:N_JETS*(j+1), :, :]
+
+            x = jnp.array(x)
+            y = jnp.array(y)
+
+            n_jets, n_tracks, _ = x.shape
+
+            batch = get_batch(x, y)
+
+            if training:
+                state, loss, loss_tasks = train_step(state, batch, key)
+            else:
+                loss, loss_tasks = eval_step(state.params, batch, key)
+            
+            running_loss.append(loss)
+            assert(len(loss_tasks) == 4)
+            for l in range(len(loss_tasks)):
+                running_loss_aux[l].append(loss_tasks[l])
+
+    for l in range(len(running_loss_aux)):
+        running_loss_aux[l] = jnp.mean(jnp.array(running_loss_aux[l])).item()
+    running_loss = jnp.mean(jnp.array(running_loss)).item()
+
+    if training:
+        print('Train - epoch: {}, loss: {}'.format(epoch, running_loss))
+    else:
+        print('Validation - epoch: {}, loss: {}'.format(epoch, running_loss))
+
+    print("(g, n, e, r) =", tuple(running_loss_aux))
+    return state, running_loss, running_loss_aux
+
+
+def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0):
+    early_stop = EarlyStopping(min_delta=1e-6, patience=20)
+    epoch = 0
+    ckpt = None
+    counter_improvement = 0
+    learning_rate = LR_INIT
+    # TODO need to store losses?
+    train_losses = []
+    valid_losses = []
+    train_losses_aux = []
+    valid_losses_aux = []
+    import time
+
+    # while epoch < 200:
+    while True:
+        current_secs = datetime.datetime.now().second
+        key_tracks = jax.random.PRNGKey(current_secs)
+        t0 = time.time()
+        state, train_metrics, train_aux_metrics = train_epoch(state, train_dl, epoch, key_tracks, training=True)
+        state, valid_metrics, valid_aux_metrics = train_epoch(state, valid_dl, epoch, key_tracks, training=False)
+        t1 = time.time()
+        print("TIME = ", t1 - t0)
+        train_losses.append(float(train_metrics))
+        valid_losses.append(float(valid_metrics))
+        train_losses_aux.append(jnp.array(train_aux_metrics, dtype=float).tolist())
+        valid_losses_aux.append(jnp.array(valid_aux_metrics, dtype=float).tolist())
+        has_improved, early_stop = early_stop.update(valid_metrics)
+        if has_improved:
+            counter_improvement = 0
+            print("Saving model in epoch %d"%epoch)
+            ckpt = {
+                'epoch': epoch,
+                'loss_train': train_metrics,
+                'loss_valid': valid_metrics,
+                'model': state,
+                # 'optimizer': optimizer.state_dict(),
+                # 'scalers_features': scalers_features
+            }
+            checkpoints.save_checkpoint(
+                ckpt_dir=save_dir,
+                target=ckpt,
+                step=ensemble_id,
+                overwrite=True,
+                keep=100
+            )
+            with open(save_dir + f"/params_{ensemble_id}.pickle", 'wb') as fpk:
+                pickle.dump(state.params, fpk)
+        else:
+            # elif False:
+            counter_improvement += 1
+            if counter_improvement == 5:
+                learning_rate = learning_rate / 10
+                counter_improvement = 0
+                state = create_train_state(None, learning_rate=learning_rate, params=state.params)
+
+        if early_stop.should_stop:
+            print('Met early stopping criteria, breaking...')
+            break
+
+        epoch += 1
+
+    with open(save_dir + f"/loss_history_{ensemble_id}.json", "w") as histf:
+        r = json.dumps({
+            'train_total': train_losses,
+            'valid_total': valid_losses,
+            'train_aux': train_losses_aux,
+            'valid_aux': valid_losses_aux
+        }, indent=4)
+        histf.write(r)
+
+    return ckpt
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-input_dir', default=DEFAULT_DIR, help="Directory where the dataset in stored.")
+    parser.add_argument('-input_suffix', default=DEFAULT_SUFFIX, help="Name of the dataset to be loaded.")
+    parser.add_argument('-save_dir', default=DEFAULT_MODEL_DIR, help="Directory to store results.")
+    parser.add_argument('-ensemble_size', default=1, type=int, help="Number of instances to train")
+    parser.add_argument('-dev', default=False, type=bool, help="Set to True to check dimensions etc")
+    parser.add_argument('-save_plot_data', default=False, type=bool, help="Save final results for plotting?")
+    parser.add_argument('-model', type=str)
+    # Hyperparameters
+    parser.add_argument('-hidden_channels', default=64, type=int)
+    parser.add_argument('-layers', default=3, type=int)
+    parser.add_argument('-heads', default=8, type=int)
+    parser.add_argument('-augment', default=False, type=bool)
+    parser.add_argument('-name', default="test", type=str)
+    parser.add_argument('-strategy_prediction', default=None, type=str)
+
+    return parser.parse_args()
+
+
+def init_model(rng):
+    rng, init_rng = jax.random.split(rng)
+    state = create_train_state(init_rng, LR_INIT)
+    param_count = sum(x.size for x in jax.tree_util.tree_leaves(state.params))
+    print("Model and train state created")
+    print("Number of parameters:", param_count)
+    return rng, state
+
+
+if __name__ == "__main__":
+    rng = jax.random.PRNGKey(42)
+    opt = parse_args()
+
+    if opt.dev:
+        model = get_model(opt.model)
+        rng, state = init_model(rng)
+        print(type(model))
+        batch = {
+            'x': jnp.ones((N_JETS, 15, 18)), 
+            'jet_vtx': jnp.ones((N_JETS,3)), 
+            'trk_vtx': jnp.ones((N_JETS, 15, 3)), 
+            'jet_y': jnp.ones((N_JETS,3)),
+            'trk_y': jnp.ones((N_JETS, 15, 4)),
+            'edge_y': jax.nn.one_hot(jnp.ones((N_JETS, 15 ,15)).reshape(-1, 225), 2, axis=2),
+            'n_tracks': jnp.ones((N_JETS)),
+            'jet_phi': jnp.ones((N_JETS)),
+            'jet_theta': jnp.ones((N_JETS))
+        }
+        k = jax.random.PRNGKey(1)
+        with jax.disable_jit():
+            print("train begin")
+            state, running_loss, aux_losses = train_step(state, batch, k)
+            print("train done", len(aux_losses), aux_losses)
+            print("eval begin")
+            eval_step(state.params, batch, k)
+            print("eval done")
+            # test_step(state.params, batch)
+            # print("test done")
+        exit(0)
+
+    print("Loading datasets: start")
+    if ".." in opt.input_dir:
+        train_dl = torch.load("%s/train_%s.pt"%(opt.input_dir, opt.input_suffix))
+        valid_dl = torch.load("%s/valid_%s.pt"%(opt.input_dir, opt.input_suffix))
+        test_dl = torch.load("%s/test_%s.pt"%(opt.input_dir, opt.input_suffix))
+    else:
+        train_dl = torch.load("%s/train_dl.pth"%(opt.input_dir)) # '../training_data/validate_dl.pth'
+        valid_dl = torch.load("%s/validate_dl.pth"%(opt.input_dir)) # '../training_data/validate_dl.pth'
+        test_dl = torch.load("%s/test_dl.pth"%(opt.input_dir))
+    
+    print("Loading datasets: end")
+    save_dir = opt.save_dir + "/" + opt.name
+    if not os.path.exists(save_dir): 
+        os.makedirs(save_dir)
+
+    # save_config_file(save_dir, opt)
+
+    model = get_model(opt.model, save_dir=save_dir)
+    for instance_id in range(opt.ensemble_size):
+        print("Instance number:", instance_id)
+        rng, state = init_model(rng)
+        print(type(model))
+        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id)
+        print(f"Best model stats - epoch {ckpt['epoch']}:")
+        print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
+        state = ckpt['model']
+        if opt.save_plot_data:
+            pass
+            # store_predictions(state.params, test_dl, save_dir, ensemble_id=instance_id)
+

@@ -1,0 +1,31 @@
+{
+    "results_dir": "../test_plots_reg",
+    "models": [
+        "../../models/reg_big_penalty", "../../models2/reg_ste"
+    ],
+    "labels_models": [
+        "reg", "ori"
+    ],
+    "labels_graph": [
+        "b", "c", "u"
+    ],
+    "labels_edges": [
+        "Common",
+        "Distinct"
+    ],
+    "labels_nodes":[
+        "Primary",
+        "FromB",
+        "FromC",
+        "Other"
+    ],
+    "colors": [
+        "tomato", 
+        "lightseagreen", 
+        "darkorchid", 
+        "magenta"
+    ],
+    "ground_truth": "../../ground_truth",
+    "ground_truth_original": "../ground_truth"
+
+}

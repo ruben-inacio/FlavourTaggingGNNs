@@ -1,0 +1,19 @@
+{
+    "complete": {
+        "hidden_channels": 64,
+        "layers": 3,
+        "heads": 2,
+        "augment": false,
+        "strategy_prediction": null,
+        "points_as_features": false,
+        "scale": true,
+        "one_hot": false
+    },
+    "predictor": {
+        "hidden_channels": 64,
+        "layers": 3,
+        "heads": 2,
+        "strategy_sampling": "compute",
+        "method": "regression"
+    }
+}
