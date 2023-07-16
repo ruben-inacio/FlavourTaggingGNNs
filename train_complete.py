@@ -39,7 +39,7 @@ import pickle
 # GLOBAL SETTINGS
 LR_INIT = 1e-3
 N_FEATURES = 18  # DO NOT CHANGE, TO BE REMOVED
-N_JETS = 250 #0 
+N_JETS = 2500 #0 
 N_TRACKS = 15
 DEFAULT_DIR = "/lstore/titan/miochoa/TrackGeometry2023/RachelDatasets_Jun2023/all_flavors/all_flavors" 
 DEFAULT_SUFFIX =  "alljets_fitting"
@@ -88,18 +88,36 @@ def get_model(model_type, save_dir=None, settings=None):
 
 
 def get_init_input():
-    x = jnp.ones([N_JETS, N_TRACKS, 18]) * 2.0
-    batch = jnp.array(list(range(N_JETS))).repeat(N_TRACKS)
-    mask, mask_edges = mask_tracks(x, jnp.ones(x.shape[0]) * 15)
-    jet_vtx = jnp.ones([N_JETS, 3])
-    trk_vtx = jnp.ones([N_JETS, N_TRACKS, 3])
-    return x, batch, mask, jet_vtx, trk_vtx
+    x = jnp.ones([N_JETS, N_TRACKS, 51]) * 2.0
+    y = jnp.ones([N_JETS, N_TRACKS, 25])
+    batch = get_batch(x, y)
+    mask, mask_edges = mask_tracks(batch['x'], jnp.ones(x.shape[0]) * 15)
+
+    return batch, mask
 
 
 def create_train_state(rng, learning_rate, params=None):
     if params is None:  # Initialise the model
-        x, batch, mask, jet_vtx, trk_vtx = get_init_input()
-        params = model.init(rng, x, mask, jet_vtx, trk_vtx, x[:, 0, 1], x[:, 0, 1],x[:, 0, 1])['params']
+        batch, mask = get_init_input()
+        
+        params = model.init(rng, 
+            batch['x'], 
+            mask, 
+            batch['jet_vtx'], 
+            batch['trk_vtx'],
+            batch['n_tracks'],
+            batch['jet_phi'],
+            batch['jet_theta']
+        )['params']
+        if "Predictor" not in str(type(model)):
+            print("Loading NDIVE")
+            params = unfreeze(params)
+            with open(f"../models/ndive/params_0.pickle", 'rb') as fp:
+                ndive_params = pickle.load(fp)
+            params['apply_strategy_prediction_fn'] = ndive_params
+            params = freeze(params)
+        else:
+            print("Predictor only")
     tx = optax.adam(learning_rate=learning_rate)
     print("CREATING TRAIN STATE WITH LR =", learning_rate)
 

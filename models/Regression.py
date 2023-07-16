@@ -1,26 +1,33 @@
+import sys
+sys.path.append("../utils/")
+
 from flax import linen as nn  
-from utils.layers import GlobalAttention
+import jax.numpy as jnp
+try:    
+    from FlavourTaggingGNNs.utils.layers import GlobalAttention
+except ModuleNotFoundError:
+    from utils.layers import GlobalAttention
 
 
 class Regression(nn.Module):
     hidden_channels: int
 
     def setup(self):
-        self.gate_nn = nn.Dense(features=1)
+        self.gate_nn = nn.Dense(features=1, param_dtype=jnp.float64)
         self.pool = GlobalAttention(gate_nn=self.gate_nn)
         
         self.mlp_mean = nn.Sequential([
-            nn.Dense(self.hidden_channels),
+            nn.Dense(self.hidden_channels, param_dtype=jnp.float64),
             nn.relu,
-            nn.Dense(self.hidden_channels),
+            nn.Dense(self.hidden_channels, param_dtype=jnp.float64),
             nn.relu,
-            nn.Dense(3)
+            nn.Dense(3, param_dtype=jnp.float64)
         ])
             
         self.mlp_var = nn.Sequential([
-            nn.Dense(self.hidden_channels),
+            nn.Dense(self.hidden_channels, param_dtype=jnp.float64),
             nn.relu,
-            nn.Dense(self.hidden_channels),
+            nn.Dense(self.hidden_channels, param_dtype=jnp.float64),
             nn.relu,
             nn.Dense(3)
         ])

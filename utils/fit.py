@@ -6,7 +6,7 @@ config.update("jax_enable_x64", True)
 @jax.jit
 def vertex_fit(tracks,weights,seed):
     
-    n_trks = 15
+    n_trks = 16
     
     varlist = [
         "trk_pt", "trk_d0", "trk_z0", "trk_phi", "trk_theta", 
@@ -195,7 +195,7 @@ vertex_fit_vmap = jax.jit(jax.vmap(vertex_fit, in_axes=(0, 0, 0), out_axes=(0, 0
 
 def custom(f):
     
-    n_trks = 15
+    n_trks = 16
     
     @jax.custom_vjp
     def custom_f(*args):

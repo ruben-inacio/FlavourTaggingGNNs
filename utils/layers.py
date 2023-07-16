@@ -30,12 +30,12 @@ class EncoderLayer(nn.Module):
 
     def setup(self):
         self.weights = None
-        self.attn = nn.MultiHeadDotProductAttention(num_heads=self.heads)
-        self.norm1 = nn.LayerNorm()
-        self.lin1 = nn.Dense(features=4*self.hidden_channels)
+        self.attn = nn.MultiHeadDotProductAttention(num_heads=self.heads, param_dtype=jnp.float64)
+        self.norm1 = nn.LayerNorm(param_dtype=jnp.float64)
+        self.lin1 = nn.Dense(features=4*self.hidden_channels, param_dtype=jnp.float64)
 
-        self.norm2 = nn.LayerNorm()
-        self.lin2 = nn.Dense(features=self.hidden_channels)
+        self.norm2 = nn.LayerNorm(param_dtype=jnp.float64)
+        self.lin2 = nn.Dense(features=self.hidden_channels, param_dtype=jnp.float64)
         self.fwd_fn = eval("self.fwd_" + self.architecture)
     
     def fwd_post(self, x, y):

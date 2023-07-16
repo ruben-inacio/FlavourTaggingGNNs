@@ -4,12 +4,19 @@ sys.path.append("../utils/")
 import jax.numpy as jnp
 
 from flax import linen as nn  
-from models.PreProcessor import PreProcessor
-from models.Regression import Regression
-from utils.fit import ndive
-from utils.losses import squared_error
 import jax
 import datetime
+try: 
+    from FlavourTaggingGNNs.models.PreProcessor import PreProcessor
+    from FlavourTaggingGNNs.models.Regression import Regression
+    from FlavourTaggingGNNs.utils.fit import ndive
+    from FlavourTaggingGNNs.utils.losses import squared_error
+except ModuleNotFoundError as e:
+    raise e
+    from models.PreProcessor import PreProcessor
+    from models.Regression import Regression
+    from utils.fit import ndive
+    from utils.losses import squared_error
 
 
 class Predictor(nn.Module):
@@ -29,9 +36,9 @@ class Predictor(nn.Module):
 
         if self.strategy_sampling == "compute":
             self.nn_sample = nn.Sequential([
-                nn.Dense(features=self.hidden_channels),
+                nn.Dense(features=self.hidden_channels, param_dtype=jnp.float64),
                 nn.relu,
-                nn.Dense(features=1)
+                nn.Dense(features=1, param_dtype=jnp.float64)
             ])
 
         self.apply_strategy_sampling_fn = eval("self.apply_strategy_sampling_" + self.strategy_sampling)
@@ -67,16 +74,51 @@ class Predictor(nn.Module):
         weights = self.nn_sample(repr_track)
         weights = jnp.where(mask, weights, jnp.array([-jnp.inf]))
         weights = nn.activation.softmax(weights, axis=1)
-        weights = jax.lax.stop_gradient(sample(weights))
+        # weights = jax.lax.stop_gradient(sample(weights))
 
         return weights
 
-    def __call__(self, x, mask, true_jet, true_trk, *args):
-        # dummy = jnp.mean(x, where=mask, axis=1, keepdims=True).repeat(self.n_tracks, axis=1)
-        # x = jnp.where(mask, x, dummy)
-        # mask = jnp.ones(mask.shape)
-        # if x.shape[2] > 16:
-        #     x = x[:, :, :16]
+    # def __call__(self, tracks, key):
+    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta):
+        new_track = jnp.stack([
+            jnp.array([
+                0.,
+                0.,
+                0.,
+                phi,
+                theta,
+                0.,
+                0.,
+                0.,
+                0.,
+                jnp.mean(d_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
+                jnp.mean(z_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
+                jnp.mean(p_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
+                jnp.mean(t_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
+                jnp.mean(r_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
+                0.,
+                0.,
+            ]) for n,phi,theta,d_o,z_o,p_o,t_o,r_o in zip(
+                n_tracks,
+                jet_phi,
+                jet_theta,
+                x[:,:,9],
+                x[:,:,10],
+                x[:,:,11],
+                x[:,:,12],
+                x[:,:,13],
+            )
+        ]).reshape(x.shape[0],1,16)
+
+        mask = jnp.concatenate([jnp.ones((x.shape[0], 1, 1)).astype(bool), mask], axis=1)
+        x = jnp.concatenate((new_track, x[:,:,0:16]),axis=1)
+
+        # idx = jax.random.permutation(key, k)
+        # return_idx = jnp.argsort(idx)
+        # tracks = tracks[:,idx]
+        # mask = mask[:,idx]
+
+        # x = tracks
         t, g = self.preprocessor(x, mask)
 
         repr_track = jnp.concatenate([t, g], axis=2)
@@ -91,6 +133,7 @@ class Predictor(nn.Module):
         if out_chi is not None:
             out_var = jnp.nan_to_num(out_var, nan=1000., posinf=1000., neginf=1000.)
 
+        # weights = weights[:, return_idx]
         return None, None, None, out_mean, out_var, out_chi
 
     def loss(self, out, batch, mask, mask_edges):
