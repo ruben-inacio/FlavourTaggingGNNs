@@ -46,7 +46,17 @@ class TN1(nn.Module):
         self.extraplator = None
         if self.augment:
             self.extrapolator = extrapolation
-        
+            self.augm_encoder = Encoder(
+                hidden_channels=self.hidden_channels,
+                heads=self.heads,
+                layers=self.layers,
+                architecture="post"
+            )
+            self.augm_lin = nn.Dense(features=self.hidden_channels)	
+            self.augment_fn = self.add_reference	
+        else:	
+            self.augment_fn = lambda *args: args[4]
+
         if self.scale:
             if self.points_as_features:
                 self.scaler=pickle.load(open("../training_data/scaler_30jun.npy",'rb'))
@@ -59,10 +69,18 @@ class TN1(nn.Module):
             self.scale_fn = lambda x: x
 
         if self.strategy_prediction in ("fit", "regression"):
+            # FIXME 
+            # self.apply_strategy_prediction_fn = Predictor(
+            #     hidden_channels=    self.hidden_channels,
+            #     layers=             self.layers,
+            #     heads=              self.heads,
+            #     strategy_sampling=  "compute",
+            #     method=             self.strategy_prediction
+            # )
             self.apply_strategy_prediction_fn = Predictor(
-                hidden_channels=    self.hidden_channels,
-                layers=             self.layers,
-                heads=              self.heads,
+                hidden_channels=    64,
+                layers=             3,
+                heads=              2,
                 strategy_sampling=  "compute",
                 method=             self.strategy_prediction
             )
@@ -70,11 +88,6 @@ class TN1(nn.Module):
             self.apply_strategy_prediction_fn = eval("self.apply_prediction_" + self.strategy_prediction)
         else:
             self.apply_strategy_prediction_fn = lambda *args: (None, None, None, None, None, None)
-        
-        if self.augment:
-            self.augment_fn = self.add_reference
-        else:
-            self.augment_fn = lambda *args: args[2]
         
         # Output MLPs
 
@@ -124,17 +137,40 @@ class TN1(nn.Module):
             log_errors = jnp.zeros([x.shape[0], 3]) 
             return None, None, None, points, log_errors, None
 
-    def add_reference(self, x, new_ref, g, mask):
-        batch_size, n_tracks, _ = x.shape
+    def one_hot_encodings(self, x, mask, n_tracks, inv=True, thresholds=0.1):
+        x = x[:, :, 0]
+        x = jnp.where(mask[:, :, 0], x, thresholds * jnp.max(x, axis=1).reshape(-1, 1))
+        if inv:
+            ids = jnp.argsort(x, axis=1)[:, ::-1]
+        else:
+            ids = jnp.argsort(x, axis=1)
+        ids = jax.nn.one_hot(ids, n_tracks)
+        return ids
 
+    def add_reference(self, x, new_ref, new_ref_errors, t, g, mask):
+        batch_size, n_tracks, _ = x.shape
         x_prime = self.extrapolator(x, jax.lax.stop_gradient(new_ref))
+        x_prime = x_prime * mask
         if self.points_as_features:
+            if new_ref_errors.ndim == 3:
+                new_ref_errors = jax.lax.map(jnp.diag, new_ref_errors)
             x_points = jnp.repeat(new_ref, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
+            x_errors = jnp.repeat(new_ref_errors, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
             x_prime = jnp.concatenate([x_prime, x_points], axis=2)
+            # x_prime = jnp.concatenate([x_prime, x_points - x_errors, x_points + x_errors], axis=2)
             
         x_prime = self.scale_fn(x_prime)
-
+        if self.one_hot:
+            ids = self.one_hot_encodings(x_prime, mask, n_tracks, inv=False)
+            x_prime = jnp.concatenate([x_prime, ids], axis=2)
         t_prime, g_prime = self.preprocessor(x_prime, mask)
+
+        # t_mixed = jnp.concatenate([t, t_prime], axis=1)	
+        # mask_mixed = jnp.concatenate([mask, mask], axis=1)	
+        # g_mixed = self.augm_encoder(t_mixed, mask=mask_mixed)	
+        # g_mixed = jnp.concatenate([g_mixed[:, :n_tracks, :], g_mixed[:, n_tracks:, :]], axis=2)	
+        # g_mixed = self.augm_lin(g_mixed)	
+        # repr_track = jnp.concatenate([g, g_prime, g_mixed], axis=2)	
         repr_track = jnp.concatenate([g, g_prime], axis=2)
 
         return repr_track
@@ -147,20 +183,19 @@ class TN1(nn.Module):
 
         if self.points_as_features:
             x_ = jnp.concatenate([x_, jnp.zeros(shape=(batch_size, max_tracks, 3))], axis=2)
+            # x_ = jnp.concatenate([x_, jnp.zeros(shape=(batch_size, max_tracks, 6))], axis=2)
 
         x_scaled = self.scale_fn(x_)
         if self.one_hot:
-            ids = jnp.argsort(x_scaled[:, :, 0], axis=1)[:, ::-1]
-            ids = jax.nn.one_hot(ids, max_tracks)
+            ids = self.one_hot_encodings(x_scaled, mask, max_tracks)
             x_scaled = jnp.concatenate([x_scaled, ids], axis=2)
-
 
         t, g = self.preprocessor(x_scaled, mask)
             
         out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
         _, _, _, out_mean, out_var, out_chi = out_preds
-
-        repr_track = self.augment_fn(x, out_mean, g, mask)
+        
+        repr_track = self.augment_fn(x, out_mean, out_var, t, g, mask)
 
         # Compute jet-level representation
         repr_jet, _ = self.pool(repr_track, mask)
@@ -212,7 +247,6 @@ class TN1(nn.Module):
             loss_predictor = jnp.mean(loss_predictor)
         else:
             loss_predictor = 0
-
         loss = loss_graph + 0.5 * loss_nodes + 1.5 * loss_edges # + 0.1 * loss_predictor
 
         losses_aux = (loss_graph, loss_nodes, loss_edges, loss_predictor)

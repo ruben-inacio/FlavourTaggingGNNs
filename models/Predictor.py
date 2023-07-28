@@ -10,13 +10,12 @@ try:
     from FlavourTaggingGNNs.models.PreProcessor import PreProcessor
     from FlavourTaggingGNNs.models.Regression import Regression
     from FlavourTaggingGNNs.utils.fit import ndive
-    from FlavourTaggingGNNs.utils.losses import squared_error
-except ModuleNotFoundError as e:
-    raise e
+    from FlavourTaggingGNNs.utils.losses import *
+except ModuleNotFoundError:
     from models.PreProcessor import PreProcessor
     from models.Regression import Regression
     from utils.fit import ndive
-    from utils.losses import squared_error
+    from utils.losses import *
 
 
 class Predictor(nn.Module):
@@ -141,14 +140,14 @@ class Predictor(nn.Module):
 
         loss_f = jnp.sqrt(jnp.sum((batch['jet_vtx']-out_mean)**2, axis=1))
         loss_f = jnp.mean(loss_f) #, where=batch['jet_y'][:, 0] != 1)
-        
+        # loss_g = gaussian_neg_loglikelihood(batch['jet_vtx'], out_mean, jnp.exp(out_var))
         # loss_mse = squared_error(batch['jet_vtx'], out_mean)
 
         # loss_f = jnp.sqrt(jnp.sum((batch['jet_vtx']-out_mean)**2, axis=1))
         # weights = jnp.log(batch['x'][:, 0, 16])
         # loss_f = jnp.average(loss_f, weights=weights)
 
-        loss = loss_f # + .2 * loss_mse
+        loss = loss_f  #+ .2 * loss_g
 
         return loss, (0, 0, 0, loss_f)
 
