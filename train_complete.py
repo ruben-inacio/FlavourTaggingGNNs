@@ -26,6 +26,7 @@ import optax
 # from jax_models import TN1, mask_tracks, Predictor
 from models.Predictor import Predictor
 from models.GN2Plus import TN1
+from models.GN2Simple import TN1SimpleEnsemble
 from utils.layers import *
 
 import numpy as np
@@ -73,12 +74,15 @@ def get_batch(x, y):
 
 def get_model(model_type, save_dir=None, settings=None):
     if settings is None:
+        # pass
         with open("configs_models.json", "r") as f:
             settings = json.load(f)[model_type]
     if model_type == "predictor":
         model = Predictor(**settings)
     elif model_type == "complete":
         model = TN1(**settings)
+    # else:
+    #     model = TN1SimpleEnsemble(hidden_channels=32, layers=3, heads=2)
     # model = NDIVE() # 
     if save_dir is not None:
         with open(save_dir + "/config.json", "w") as f:
@@ -382,6 +386,7 @@ if __name__ == "__main__":
     else:
         train_dl = torch.load("%s/train_dl.pth"%(opt.input_dir)) # '../training_data/validate_dl.pth'
         valid_dl = torch.load("%s/validate_dl.pth"%(opt.input_dir)) # '../training_data/validate_dl.pth'
+
         if opt.save_plot_data:
             test_dl = torch.load("%s/test_dl.pth"%(opt.input_dir))
     

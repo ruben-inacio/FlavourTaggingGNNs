@@ -29,13 +29,13 @@ class Regression(nn.Module):
             nn.relu,
             nn.Dense(self.hidden_channels, param_dtype=jnp.float64),
             nn.relu,
-            nn.Dense(3)
+            nn.Dense(3, param_dtype=jnp.float64)
         ])
 
     def __call__(self, x, repr_track, weights, mask, *args):
         pooled, _ = self.pool(weights * repr_track, mask=mask)
         out_mean = self.mlp_mean(pooled)
         out_var = self.mlp_var(pooled)
-
+        
         return out_mean, out_var, None
 

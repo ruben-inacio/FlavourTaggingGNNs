@@ -3,6 +3,8 @@ from flax import linen as nn
 
 import jax.numpy as jnp
 import jax
+import datetime
+
 try:
     from FlavourTaggingGNNs.utils.layers import GlobalAttention, EncoderLayer, Encoder
     from FlavourTaggingGNNs.utils.losses import *
@@ -121,6 +123,12 @@ class TN1(nn.Module):
             nn.Dense(2, param_dtype=jnp.float64)            
         ])
 
+        # self.mlp_thresholds = nn.Sequential([
+        #     nn.Dense(self.hidden_channels, param_dtype=jnp.float64),
+        #     nn.relu,
+        #     nn.Dense(1, param_dtype=jnp.float64),
+        #     nn.sigmoid
+        # ])
         self.softmax = lambda x: nn.activation.softmax(x, axis=1)
     
     def apply_prediction_none(self, x, mask, *args):
@@ -137,7 +145,20 @@ class TN1(nn.Module):
             log_errors = jnp.zeros([x.shape[0], 3]) 
             return None, None, None, points, log_errors, None
 
-    def one_hot_encodings(self, x, mask, n_tracks, inv=True, thresholds=0.1):
+    def get_thresholds(self, x, mask):
+        key = jax.random.PRNGKey(datetime.datetime.now().second)
+        x = x[:, : ,0]
+        x = jnp.where(mask[:, :, 0], x, -jnp.inf)
+        top_pt = jnp.max(x, axis=1)
+        alpha = top_pt / jnp.mean(x, axis=1, where=mask[:, :, 0])
+        x = jnp.where(mask[:, :, 0], x, jnp.inf)
+        beta =  top_pt / jnp.min(x, axis=1)
+        thresholds = jax.random.beta(key, alpha, beta)
+        thresholds = thresholds.reshape(-1, 1)
+        return thresholds        
+
+    # def one_hot_encodings(self, x, mask, n_tracks, inv=True, thresholds=0.1):
+    def one_hot_encodings(self, x, mask, n_tracks, thresholds, inv=True):
         x = x[:, :, 0]
         x = jnp.where(mask[:, :, 0], x, thresholds * jnp.max(x, axis=1).reshape(-1, 1))
         if inv:
@@ -146,8 +167,9 @@ class TN1(nn.Module):
             ids = jnp.argsort(x, axis=1)
         ids = jax.nn.one_hot(ids, n_tracks)
         return ids
+        # return jnp.ones([x.shape[0], x.shape[1], x.shape[1]])
 
-    def add_reference(self, x, new_ref, new_ref_errors, t, g, mask):
+    def add_reference(self, x, new_ref, new_ref_errors, t, g, mask, thresholds):
         batch_size, n_tracks, _ = x.shape
         x_prime = self.extrapolator(x, jax.lax.stop_gradient(new_ref))
         x_prime = x_prime * mask
@@ -157,20 +179,15 @@ class TN1(nn.Module):
             x_points = jnp.repeat(new_ref, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
             x_errors = jnp.repeat(new_ref_errors, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
             x_prime = jnp.concatenate([x_prime, x_points], axis=2)
-            # x_prime = jnp.concatenate([x_prime, x_points - x_errors, x_points + x_errors], axis=2)
-            
+
         x_prime = self.scale_fn(x_prime)
+        
+        # x_prime = jnp.concatenate([x_prime, thresholds.reshape(-1, 1).repeat(n_tracks, axis=1).reshape(-1, n_tracks, 1)], axis=2)
         if self.one_hot:
-            ids = self.one_hot_encodings(x_prime, mask, n_tracks, inv=False)
+            ids = self.one_hot_encodings(x_prime, mask, n_tracks, thresholds, inv=False)
             x_prime = jnp.concatenate([x_prime, ids], axis=2)
         t_prime, g_prime = self.preprocessor(x_prime, mask)
 
-        # t_mixed = jnp.concatenate([t, t_prime], axis=1)	
-        # mask_mixed = jnp.concatenate([mask, mask], axis=1)	
-        # g_mixed = self.augm_encoder(t_mixed, mask=mask_mixed)	
-        # g_mixed = jnp.concatenate([g_mixed[:, :n_tracks, :], g_mixed[:, n_tracks:, :]], axis=2)	
-        # g_mixed = self.augm_lin(g_mixed)	
-        # repr_track = jnp.concatenate([g, g_prime, g_mixed], axis=2)	
         repr_track = jnp.concatenate([g, g_prime], axis=2)
 
         return repr_track
@@ -183,11 +200,15 @@ class TN1(nn.Module):
 
         if self.points_as_features:
             x_ = jnp.concatenate([x_, jnp.zeros(shape=(batch_size, max_tracks, 3))], axis=2)
-            # x_ = jnp.concatenate([x_, jnp.zeros(shape=(batch_size, max_tracks, 6))], axis=2)
 
         x_scaled = self.scale_fn(x_)
+        
+        # thresholds = self.mlp_thresholds(x_[:, :, 0])
+        # x_scaled = jnp.concatenate([x_scaled, thresholds.reshape(-1, 1).repeat(max_tracks, axis=1).reshape(-1, max_tracks, 1)], axis=2)
+        thresholds = jax.lax.stop_gradient(self.get_thresholds(x, mask))
+        # thresholds = 0
         if self.one_hot:
-            ids = self.one_hot_encodings(x_scaled, mask, max_tracks)
+            ids = self.one_hot_encodings(x_scaled, mask, max_tracks, thresholds)
             x_scaled = jnp.concatenate([x_scaled, ids], axis=2)
 
         t, g = self.preprocessor(x_scaled, mask)
@@ -195,7 +216,7 @@ class TN1(nn.Module):
         out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
         _, _, _, out_mean, out_var, out_chi = out_preds
         
-        repr_track = self.augment_fn(x, out_mean, out_var, t, g, mask)
+        repr_track = self.augment_fn(x, out_mean, out_var, t, g, mask, thresholds=thresholds)
 
         # Compute jet-level representation
         repr_jet, _ = self.pool(repr_track, mask)

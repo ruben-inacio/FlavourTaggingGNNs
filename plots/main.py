@@ -38,6 +38,8 @@ if __name__ == "__main__":
 
     if not os.path.exists(settings['results_dir']): 
         os.makedirs(settings['results_dir'])
+        os.makedirs(settings['results_dir'] + "/pt")
+        os.makedirs(settings['results_dir'] + "/ntrks")
 
     models = settings['models']
 
@@ -110,16 +112,18 @@ if __name__ == "__main__":
             try:
                 results_nodes_clf = np.load(f"{m}/results_nodes_clf_{run}.npy")
                 results_nodes_clf = results_nodes_clf.reshape(-1, 4)
-                if true_nodes.shape[0] < result_nodes_clf.shape[0]:
-                    result_nodes_clf = result_nodes_clf[valid_nodes]
+                if true_nodes.shape[0] < results_nodes_clf.shape[0]:
+                    results_nodes_clf = results_nodes_clf[valid_nodes]
                 assert(results_nodes_clf.shape[0] == true_nodes.shape[0])
 
                 results_edges_clf = np.load(f"{m}/results_edges_clf_{run}.npy")
-                if results_edges_clf.ndim == 3 and results_edges_clf.shape[-1] != 2:
-                    results_edges_clf = results_edges_clf.reshape(-1, 1)
+                if results_edges_clf.ndim == 3:
+                    results_edges_clf = results_edges_clf.reshape(-1, results_edges_clf.shape[-1])
                     if true_edges.shape[0] < results_edges_clf.shape[0]:
                         results_edges_clf = results_edges_clf[valid_edges]
-                    results_edges_clf = np.concatenate([1 - results_edges_clf, results_edges_clf], axis=1)
+                    if results_edges_clf.shape[-1] == 1:
+                        results_edges_clf = np.concatenate([1 - results_edges_clf, results_edges_clf], axis=1)
+
                 assert(results_edges_clf.shape[0] == true_edges.shape[0])
 
                 predictions_nodes_clf[-1].append(results_nodes_clf)
@@ -127,16 +131,21 @@ if __name__ == "__main__":
             except Exception as e:
                 print("Classification plots disabled.")
                 do_classifications = False
+                # raise e
 
 
     labels = settings['labels_models']
-    if do_regression:
+    if False and do_regression:
         # Duplicate for jet_trks
-        plot_discriminated_by_flavour(predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, r"Jet $p_{T}$ [GeV]", labels)
-        plot_global_performance(predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, r"Jet $p_{T}$ [GeV]", labels)
-        plot_fitting_average(predictions_fitting, predictions_errors, true_vtx, true_graph, labels)
-        # performance_regression(labels, predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts)
-        # performance_regression(labels, predictions_fitting, predictions_errors, true_vtx, true_graph, jet_trks)
+        # plot_discriminated_by_flavour(
+        #     predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, r"Jet $p_{T}$ [GeV]", labels, 'pt',[20, 40, 60, 80, 100, 200])
+        # plot_global_performance(
+        #     predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, r"Jet $p_{T}$ [GeV]", labels, 'pt', [20, 40, 60, 80, 100, 200])
+        plot_discriminated_by_flavour(
+            predictions_fitting, predictions_errors, true_vtx, true_graph, jet_trks, r"#Tracks", labels, 'ntrks', list(range(1, 16)))
+        plot_global_performance(
+            predictions_fitting, predictions_errors, true_vtx, true_graph, jet_trks, r"#Tracks", labels, 'ntrks', list(range(1, 16)))
+        # plot_fitting_average(predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, labels, [20, 40, 60, 80, 100, 200])
 
     if do_jet_roc:
         performance_roc_jets(predictions_graph_clf, true_graph, labels)

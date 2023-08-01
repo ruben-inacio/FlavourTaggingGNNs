@@ -30,7 +30,7 @@ def squared_error(targets, predictions, mean=True):
 
 
 def gaussian_neg_loglikelihood(targets, predictions, errors, mean=True, eps=1e-6):
-    errors = max(errors, eps)
+    errors = errors.clip(min=eps)
     loss = 0.5 * (jnp.log(errors) + jnp.square(predictions - targets) / errors)
 
     if mean:

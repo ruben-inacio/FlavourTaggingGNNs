@@ -171,7 +171,7 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
     ax[0].set_yscale("log")
     ax[0].set_ylabel("Background rejection")
     ax[0].legend(loc="upper right", handles=handles)
-    ax[0].set_xlim(0.4,1)
+    ax[0].set_xlim(0.6, 1)
     # ax[0].text(0.05, 0.9, "f=%.3f"%f, fontsize=12, transform=ax[0].transAxes)
 
     # Ratio panel
@@ -197,7 +197,7 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
     
     ax[1].set_xlabel("b-jet efficiency")
     ax[1].set_ylabel("Ratio to " + labels[0])
-    ax[1].set_xlim(.4,1)
+    ax[1].set_xlim(.6, 1)
     ax[1].legend(loc="upper right", handles=[cjet, ujet])
     plt.tight_layout()
     plt.savefig(f"{save_dir}/ATLAS_roc_ensemble_bcu.pdf")

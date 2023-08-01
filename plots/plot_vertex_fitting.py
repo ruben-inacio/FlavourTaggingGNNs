@@ -16,58 +16,67 @@ from scipy import interpolate
 import numpy as np
 import argparse
 import json
+from copy import deepcopy
 
 
-
-bins = [20, 40, 60, 80, 100, 150, 200]
 
 euclidean_distance = lambda x, y: np.sqrt(np.sum((x - y)**2, axis=1))
 difference = lambda x, y: x - y
 
-difference_x = lambda x, y: x[:, 0] - y[:, 0]
-difference_y = lambda x, y: x[:, 1] - y[:, 1]
-difference_z = lambda x, y: x[:, 2] - y[:, 2]
+# FIXME ver com o prof pedro
+difference_x = lambda x, y: (x[:, 0] - y[:, 0])
+# difference_x = lambda x, y: np.abs(x[:, 0] - y[:, 0])
+difference_y = lambda x, y: (x[:, 1] - y[:, 1])
+difference_z = lambda x, y: (x[:, 2] - y[:, 2])
 # euc_dist_norm = lambda x, y: .5 * np.var(x - y, axis=1) / (np.var(x, axis=1) + np.var(y, axis=1))
 
+def assign_bins(results, jet_var, bins, mean=True):
+    bins_values = []
+    bins_values_std = []
+    jet_bins = []
+    for i in range(len(bins)):
+        bins_values.append([])
+        bins_values_std.append([])
+    # Assign each jet value to a bin
+    counter = 0
+    for i in range(len(jet_var)):
+        belongs_to_something = False
+        for j in range(len(bins)-1):
+            if j < len(bins) - 2 and jet_var[i] >= bins[j] and jet_var[i] < bins[j+1]:
+                jet_bins.append(j)
+                bins_values[j].append(results[i])
+                belongs_to_something = True
+                break
+            elif j == len(bins) - 2 and jet_var[i] >= bins[j] and jet_var[i] <= bins[j+1]:
+                jet_bins.append(j)
+                bins_values[j].append(results[i])        
+                belongs_to_something = True
+        if not belongs_to_something:
+            counter += 1
 
-
-
-def plot_bins(predictions, targets, result_fn, jet_var, save_dir, name, colors, labels, bins, xlabel=None, ylabel=None, ylims=None, errors=None):
-    def assign_bins(results, jet_var):
-        bins_values = []
-        jet_bins = []
-        for i in range(len(bins)):
-            bins_values.append([])
-        # Assign each jet value to a bin
-        counter = 0
-        for i in range(len(jet_var)):
-            belongs_to_something = False
-            for j in range(len(bins)-1):
-                if j < len(bins) - 2 and jet_var[i] >= bins[j] and jet_var[i] < bins[j+1]:
-                    jet_bins.append(j)
-                    bins_values[j].append(results[i])
-                    belongs_to_something = True
-                    break
-                elif j == len(bins) - 2 and jet_var[i] >= bins[j] and jet_var[i] <= bins[j+1]:
-                    jet_bins.append(j)
-                    bins_values[j].append(results[i])        
-                    belongs_to_something = True
-            if not belongs_to_something:
-                counter += 1
-
-        # print(counter, "samples with no bin")
-        for i in range(len(bins)-1):
-            values_to_mean = bins_values[i]
-            bins_values[i] = np.nanmean(values_to_mean)
-            # bins_values[i] = np.mean(values_to_mean)
-            if "nan" == str(bins_values[i]):
-                # print(i, values_to_mean)
-                print("nan found")
-
-        for i in range(len(bins)-2, 0, -1):
-            bins_values.insert(i, bins_values[i-1])
-        bins_values[-1] = bins_values[-2]
+    if not mean:
         return bins_values
+
+    # print(counter, "samples with no bin")
+    for i in range(len(bins)-1):
+        values_to_mean = bins_values[i]
+        bins_values[i] = np.nanmean(values_to_mean)
+        bins_values_std[i] = np.nanstd(values_to_mean)
+        # bins_values[i] = np.mean(values_to_mean)
+        if "nan" == str(bins_values[i]):
+            # print(i, values_to_mean)
+            print("nan found")
+    print("BINS VALUES", bins_values)
+    for i in range(len(bins)-2, 0, -1):
+        bins_values.insert(i, bins_values[i-1])
+        bins_values_std.insert(i, bins_values_std[i-1])
+    bins_values[-1] = bins_values[-2]
+    bins_values_std[-1] = bins_values_std[-2]
+    return bins_values, bins_values_std
+
+
+
+def plot_bins(predictions, targets, result_fn, jet_var, save_dir, name, colors, labels, bins, xlabel=None, ylabel=None, ylims=None, errors=None, show_errors=False):
 
     fig, ax = plt.subplots(1, figsize=(8,8))#, gridspec_kw={'height_ratios': [2, 1]})
     bins = list(bins)
@@ -81,14 +90,19 @@ def plot_bins(predictions, targets, result_fn, jet_var, save_dir, name, colors, 
     bins_values_std = []
     for t in range(len(predictions)):
         bins_values_aux = []
+        bins_values_std_aux = []
         for inst in range(len(predictions[t])):
             results = result_fn(predictions[t][inst], targets[t])
-            bins_values_aux.append(assign_bins(results, jet_var=jet_var[t]))
+            m, std = assign_bins(results, jet_var=jet_var[t], bins=bins)
+            bins_values_aux.append(m)
+            bins_values_std_aux.append(std)
 
         bins_values_aux = np.array(bins_values_aux)
+        bins_values_std_aux = np.array(bins_values_std_aux)
 
         bins_values_mean.append(bins_values_aux.mean(axis=0))
-        bins_values_std.append(bins_values_aux.std(axis=0))
+        bins_values_std.append(bins_values_std_aux.mean(axis=0))
+
 
     for i in range(len(bins)-2, 0, -1):
         bins.insert(i, bins[i])
@@ -97,7 +111,8 @@ def plot_bins(predictions, targets, result_fn, jet_var, save_dir, name, colors, 
         plt.plot(bins, bins_values_mean[x], label=labels[x], color=colors[x])#, color=colors[m])
         std_upper = bins_values_mean[x] + bins_values_std[x]
         std_lower = bins_values_mean[x] - bins_values_std[x]
-        plt.fill_between(bins, std_lower, std_upper, color=colors[x], alpha=0.2)
+        if show_errors:
+            plt.fill_between(bins, std_lower, std_upper, color=colors[x], alpha=0.2)
         if ylims is None:
             y_max = max(y_max, 1.05 * max(bins_values_mean[x]))
             y_min = min(y_min, min(bins_values_mean[x]) - .05*abs(min(bins_values_mean[x])))  # FIXME
@@ -106,7 +121,10 @@ def plot_bins(predictions, targets, result_fn, jet_var, save_dir, name, colors, 
     ax.set_xlim(min(bins), max(bins))
 
     ax.set_ylabel(ylabel)
-    ax.set_ylim(y_min, y_max)
+    try:
+        ax.set_ylim(y_min, y_max)
+    except:
+        ax.set_ylim(0, 11)
     ax.legend(loc="lower right")
     plt.tight_layout()
     plt.savefig(f"{save_dir}/{name}.pdf")
@@ -245,11 +263,11 @@ def plots_3d_fitting(arr_true,arr_pred,arr_sigma,ds_name,save_dir, name):
 
 
 # Higher-level functions
-def plot_global_performance(predictions, errors, true_vtx, true_graph, jet_var, jet_var_label, labels):
+def plot_global_performance(predictions, errors, true_vtx, true_graph, jet_var, jet_var_label, labels, var_dir, bins):
     with open("configs.json", "r") as f:
         settings = json.load(f)
         colors = settings['colors']
-        results_dir = settings['results_dir']
+        results_dir = settings['results_dir'] + "/" + var_dir
 
     plot_bins(
         predictions, 
@@ -279,12 +297,12 @@ def plot_global_performance(predictions, errors, true_vtx, true_graph, jet_var, 
             colors,
             labels,
             (-5, 5),
-            xlabel=jet_var_label,
-            ylabel=labels_axs[dimension] + " [mm]"
+            xlabel=labels_axs[dimension] + " [mm]",
+            ylabel=""
         )
 
 
-def plot_fitting_average(predictions, errors, true_vtx, true_graph, labels):
+def plot_fitting_average(predictions, errors, true_vtx, true_graph, jet_var, labels, bins):
     with open("configs.json", "r") as f:
         settings = json.load(f)
         results_dir = settings['results_dir']
@@ -298,6 +316,29 @@ def plot_fitting_average(predictions, errors, true_vtx, true_graph, labels):
     errors = list(errors) # |models| x |test_dl| x 3
 
     flavour_set = np.unique(true_graph).tolist()
+
+    for m in range(len(predictions)):
+        pred_bins = assign_bins(predictions[m], jet_var, bins, mean=False)
+        errors_bins = assign_bins(errors[m], jet_var, bins, mean=False)
+        true_vtx_bins = assign_bins(true_vtx, jet_var, bins, mean=False)
+        true_graph_bins = assign_bins(true_graph, jet_var, bins, mean=False)
+
+        for i in range(1, len(bins)-1):
+            for flavour in flavour_set:
+                true_vtx_bins[i] = np.array(true_vtx_bins[i])
+                pred_bins[i] = np.array(pred_bins[i])
+                errors_bins[i] = np.array(errors_bins[i])
+                true_graph_bins[i] = np.array(true_graph_bins[i])
+
+                plots_3d_fitting(
+                    true_vtx_bins[i][true_graph_bins[i] == flavour], 
+                    pred_bins[i][true_graph_bins[i] == flavour], 
+                    errors_bins[i][true_graph_bins[i] == flavour], 
+                    "Test dataset", 
+                    results_dir,
+                    f"fitting_flavour_bin_{i}_flavour_{flavour}_{labels[m]}"
+                )    
+
     for m in range(len(predictions)):
         plots_3d_fitting(true_vtx, predictions[m], errors[m], "Test dataset", results_dir, f"fitting_{labels[m]}")
         for flavour in flavour_set:
@@ -311,10 +352,12 @@ def plot_fitting_average(predictions, errors, true_vtx, true_graph, labels):
             )
 
 
-def plot_discriminated_by_flavour(predictions, errors, true_vtx, true_graph, jet_var, jet_var_label, labels):
+
+
+def plot_discriminated_by_flavour(predictions, errors, true_vtx, true_graph, jet_var, jet_var_label, labels, var_dir, bins):
     with open("configs.json", "r") as f:
         settings = json.load(f)
-        results_dir = settings['results_dir']
+        results_dir = settings['results_dir'] + "/" + var_dir
         colors = settings['colors']
         labels_flav= settings['labels_graph']
 
@@ -390,8 +433,8 @@ def plot_discriminated_by_flavour(predictions, errors, true_vtx, true_graph, jet
                 colors,
                 labels_flav,
                 (-5, 5),
-                xlabel=jet_var_label,
-                ylabel=labels_axs[dimension] + " [mm]"
+                xlabel=labels_axs[dimension] + " [mm]",
+                ylabel=""
             )
         
             plot_bins(
