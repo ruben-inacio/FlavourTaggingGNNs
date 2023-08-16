@@ -1,19 +1,19 @@
 {
     "complete": {
-        "hidden_channels": 64,
+        "hidden_channels": 32,
         "layers": 3,
         "heads": 2,
-        "augment": false,
-        "strategy_prediction": null,
-        "points_as_features": false,
-        "scale": true,
-        "one_hot": false
+        "augment": true,
+        "strategy_prediction": "perfect",
+        "points_as_features": true,
+        "scale": false,
+        "strategy_one_hot": "beta"
     },
     "predictor": {
-        "hidden_channels": 64,
+        "hidden_channels": 32,
         "layers": 3,
         "heads": 2,
         "strategy_sampling": "compute",
-        "method": "regression"
+        "method": "fit"
     }
 }

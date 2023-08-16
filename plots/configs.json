@@ -1,10 +1,10 @@
 {
-    "results_dir": "../test_plots_reg",
+    "results_dir": "../../plots_onehot_study_3007",
     "models": [
-        "../../models/reg_big_penalty", "../../models2/reg_ste"
+        "../../models/gn2_ndive_onehot_threshold_010_inv",   "../../models/gn2_ndive_onehot_threshold_000_inv", "../../models/gn2_ndive_onehot_threshold_mlp_inv", "../../models/gn2_ndive_onehot_threshold_beta_inv"
     ],
     "labels_models": [
-        "reg", "ori"
+        "10", "00", "mlp", "beta"
     ],
     "labels_graph": [
         "b", "c", "u"
@@ -25,7 +25,11 @@
         "darkorchid", 
         "magenta"
     ],
-    "ground_truth": "../../ground_truth",
-    "ground_truth_original": "../ground_truth"
+    "ground_truth": "../../ground_truth_1407",
+    "ground_truth_rachel": "../../DifferentiableVertexingProject",
+    "ground_truth_original": "../../ground_truth_1407",
+    "ndive_path": [
+        "../../DifferentiableVertexingProject/models/ftag_wVertexFit_NDIVE/"
+    ]
 
 }
