@@ -22,6 +22,7 @@ class Predictor(nn.Module):
     hidden_channels: int
     layers: int
     heads: int
+    strategy_weights: str
     strategy_sampling: str
     method: str
 
@@ -33,26 +34,29 @@ class Predictor(nn.Module):
             architecture="post"
         )
 
-        if self.strategy_sampling == "compute":
+        if self.strategy_weights == "compute":
             self.nn_sample = nn.Sequential([
                 nn.Dense(features=self.hidden_channels, param_dtype=jnp.float64),
                 nn.relu,
                 nn.Dense(features=1, param_dtype=jnp.float64)
             ])
 
-        self.apply_strategy_sampling_fn = eval("self.apply_strategy_sampling_" + self.strategy_sampling)
+        self.apply_strategy_weights_fn = eval("self.apply_strategy_weights_" + self.strategy_weights)
+        self.sample_fn = eval("self.sample_" + self.strategy_sampling)
+        if self.strategy_sampling != "none":
+            self.sample_fn = lambda *args: jax.lax.stop_gradient(self.sample_fn(*args))
 
         if self.method == "regression":
             self.fitting_method = Regression(hidden_channels=self.hidden_channels)
         else:
             self.fitting_method = lambda x, _, wv, mask: ndive(x, jnp.where(mask.squeeze(), wv.squeeze(), 1e-100), jnp.zeros([x.shape[0], 3]))
 
-    def apply_strategy_sampling_none(self, repr_track, mask, true_jet, true_trk):
+    def apply_strategy_weights_none(self, repr_track, mask, true_jet, true_trk):
         weights = jnp.ones(mask.shape)
         weights = (weights * mask)
         return weights
 
-    def apply_strategy_sampling_perfect(self, repr_track, mask, true_jet, true_trk):
+    def apply_strategy_weights_perfect(self, repr_track, mask, true_jet, true_trk):
         true_trk = true_trk.reshape(-1 ,3)
         true_jet = true_jet.repeat(repr_track.shape[1], axis=0)
         weights = (true_jet[:, 0] == true_trk[:, 0]) & (true_jet[:, 1] == true_trk[:, 1]) & (true_jet[:, 2] == true_trk[:, 2])
@@ -61,19 +65,24 @@ class Predictor(nn.Module):
         weights = (mask & weights).astype(float)
         return weights
 
-    def apply_strategy_sampling_compute(self, repr_track, mask, true_jet, true_trk):
-        def sample(w):
-            current_date = datetime.datetime.now()
-            key = jax.random.PRNGKey(current_date.second)
-            selection = jax.random.bernoulli(key, w) # jnp.sqrt(w))
-            w = selection * w
-            w = nn.activation.softmax(w, axis=1)
-            return w
+    def sample_bernoulli(self, w):
+        current_date = datetime.datetime.now()
+        key = jax.random.PRNGKey(current_date.second)
+        selection = jax.random.bernoulli(key, w) # jnp.sqrt(w))
+        w = selection * w
+        w = nn.activation.softmax(w, axis=1)
+        return w
+
+    def sample_none(self, w):
+        return w
+
+    def apply_strategy_weights_compute(self, repr_track, mask, true_jet, true_trk):
 
         weights = self.nn_sample(repr_track)
         weights = jnp.where(mask, weights, jnp.array([-jnp.inf]))
         weights = nn.activation.softmax(weights, axis=1)
-        # weights = jax.lax.stop_gradient(sample(weights))
+        # FIXME
+        # weights = jax.lax.stop_gradient(self.sample_fn(weights))
 
         return weights
 
@@ -122,7 +131,7 @@ class Predictor(nn.Module):
 
         repr_track = jnp.concatenate([t, g], axis=2)
 
-        weights = self.apply_strategy_sampling_fn(repr_track, mask, true_jet, true_trk)            
+        weights = self.apply_strategy_weights_fn(repr_track, mask, true_jet, true_trk)            
         out_mean, out_var, out_chi = self.fitting_method(x, repr_track, weights, mask)
         
         out_mean = jnp.clip(out_mean, a_min=-4000., a_max=4000.)

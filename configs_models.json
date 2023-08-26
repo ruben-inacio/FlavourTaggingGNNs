@@ -3,17 +3,19 @@
         "hidden_channels": 32,
         "layers": 3,
         "heads": 2,
-        "augment": true,
-        "strategy_prediction": "perfect",
-        "points_as_features": true,
+        "augment": false,
+        "strategy_prediction": null,
+        "points_as_features": false,
+        "errors_as_features": false,
         "scale": false,
-        "strategy_one_hot": "beta"
+        "strategy_one_hot": null
     },
     "predictor": {
-        "hidden_channels": 32,
+        "hidden_channels": 64,
         "layers": 3,
-        "heads": 2,
-        "strategy_sampling": "compute",
-        "method": "fit"
+        "heads": 8,
+        "strategy_weights": "compute",
+        "strategy_sampling": "none",
+        "method": "regression"
     }
 }

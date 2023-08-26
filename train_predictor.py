@@ -61,7 +61,7 @@ def parse_args():
     parser.add_argument(
         "-b",
         "--batch_size",
-        default=100,
+        default=2500,
         type=int,
         help='Number of jets per batch.'
     )
@@ -326,7 +326,7 @@ def main():
     valid_losses = []
     train_losses_aux = []
     valid_losses_aux = []
-    save_dir = "../models/ndive"
+    save_dir = "../models/test"
     import time
     while True:
         key = jax.random.PRNGKey(datetime.datetime.now().second)

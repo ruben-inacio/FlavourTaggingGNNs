@@ -16,6 +16,7 @@ from typing import Any, Callable, Sequence
 from jax import lax, random, numpy as jnp
 from flax.core import freeze, unfreeze
 from flax import linen as nn  
+import flax
 from jax.config import config
 from flax.training import train_state, checkpoints
 from flax.training.early_stopping import EarlyStopping
@@ -23,6 +24,7 @@ config.update("jax_enable_x64", True)
 config.update("jax_debug_nans", False)
 
 import optax       
+from functools import partial
 # from jax_models import TN1, mask_tracks, Predictor
 from models.Predictor import Predictor
 from models.GN2Plus import TN1
@@ -37,123 +39,111 @@ from torch_geometric.loader import DataLoader
 import json
 import pickle
 from train_utils import *
-
-# GLOBAL SETTINGS
-LR_INIT = 1e-3
-N_FEATURES = 18  # DO NOT CHANGE, TO BE REMOVED
-N_JETS = 2500 #0 
-N_TRACKS = 15
+import time
 
 
-@jax.jit
-def train_step(state, batch, key):
-    def loss_fn(params):
-        out = model.apply(
-            {'params': params}, 
-            batch['x'], 
-            mask, 
-            batch['jet_vtx'], 
-            batch['trk_vtx'],
-            batch['n_tracks'],
-            batch['jet_phi'],
-            batch['jet_theta'],
-        )
-        return model.loss(out, batch, mask, mask_edges)
+@partial(jax.pmap, axis_name="device", in_axes=(None, 0, 0, 0),  out_axes=(0, 0, 0))
+def train_step_pmap(key, state, batch_x, batch_y):  
+
+    def train_step(state, batch_x, batch_y):
+        def loss_fn(params):
+            batch = get_batch(batch_x, batch_y)
+            mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+            out = model.apply(
+                {'params': params}, 
+                batch['x'], 
+                mask, 
+                batch['jet_vtx'], 
+                batch['trk_vtx'],
+                batch['n_tracks'],
+                batch['jet_phi'],
+                batch['jet_theta'],
+            )
+            loss, losses = model.loss(out, batch, mask, mask_edges)
+            return loss, losses
         
-    mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+        grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+        (loss, losses), grads = grad_fn(state.params)
+        return loss, losses, grads
 
-    # idx = jax.random.permutation(key, 15)
-    # batch['x'] = batch['x'][:, idx]
-    # batch['trk_y'] = batch['trk_y'][:, idx]
-    # batch['edge_y'] = batch['edge_y'].reshape(2500, 15, 15, 2)[:, idx, :, :].reshape(2500, 225, 2)
-    # batch['trk_vtx'] = batch['trk_vtx'][:, idx]
-    # batch['jet_vtx'] = batch['jet_vtx'][:, idx]
-    # # batch['y'] = batch['y'][:, idx]  
-    # mask = mask[:, idx]
-    # mask_edges = mask_edges[:, idx, :]
-    # mask_edges = mask_edges[:, :, idx]
+    train_step_vmap = jax.vmap(train_step, in_axes=(None, 0, 0), out_axes=(0, 0, 0))
 
-    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-    (loss, loss_tasks), grads = grad_fn(state.params)
-    state = state.apply_gradients(grads=grads)
+    loss, losses, grads = train_step_vmap(state, batch_x, batch_y)
+    loss_total = jnp.mean(loss)
 
-    return state, loss, loss_tasks
+    return loss_total, losses, grads
 
 
-@jax.jit
-def eval_step(params, batch, key):
-    batch_idx = jnp.array(list(range(N_JETS))).repeat(15)
+@partial(jax.pmap, axis_name="device", in_axes=(None, 0, 0, 0),  out_axes=(0, 0))
+def eval_step_pmap(key, state, batch_x, batch_y):    
 
-    mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+    def eval_step(state, batch_x, batch_y):
+        batch = get_batch(batch_x, batch_y)
+        mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+        out = model.apply(
+                {'params': state.params}, 
+                batch['x'], 
+                mask, 
+                batch['jet_vtx'], 
+                batch['trk_vtx'],
+                batch['n_tracks'],
+                batch['jet_phi'],
+                batch['jet_theta'],
+            )
+        loss, losses = model.loss(out, batch, mask, mask_edges)
+        return loss, losses
 
-    # idx = jax.random.permutation(key, 15)
-    # batch['x'] = batch['x'][:, idx]
-    # batch['trk_y'] = batch['trk_y'][:, idx]
-    # batch['edge_y'] = batch['edge_y'].reshape(2500, 15, 15, 2)[:, idx, :, :].reshape(2500, 225, 2)
-    # batch['trk_vtx'] = batch['trk_vtx'][:, idx]
-    # batch['jet_vtx'] = batch['jet_vtx'][:, idx]
-    # # batch['y'] = batch['y'][:, idx]  
-    # mask = mask[:, idx]
+    eval_step_vmap = jax.vmap(eval_step, in_axes=(None, 0, 0), out_axes=(0, 0))
 
-    # mask_edges = mask_edges[:, idx, :]
-    # mask_edges = mask_edges[:, :, idx]
+    loss, losses = eval_step_vmap(state, batch_x, batch_y)
+    loss_total = jnp.mean(loss)
 
-    out = model.apply(
-        {'params': params}, 
-        batch['x'], 
-        mask, 
-        batch['jet_vtx'], 
-        batch['trk_vtx'],
-        batch['n_tracks'],
-        batch['jet_phi'],
-        batch['jet_theta'],
-    )
-    return model.loss(out, batch, mask, mask_edges)
+    return loss_total, losses
 
 
 @jax.jit
-def test_step(params, batch):
-    batch_idx = jnp.array(list(range(N_JETS))).repeat(15)
+def update_model(state, grads):
 
-    mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
-    return model.apply(
-        {'params': params}, 
-        batch['x'], 
-        mask, 
-        batch['jet_vtx'], 
-        batch['trk_vtx'],
-        batch['n_tracks'],
-        batch['jet_phi'],
-        batch['jet_theta'],
-    )[:6]
+    def gradient_application(i, st):
+
+        m = jnp.int32(jnp.floor(i/TRAIN_VMAP_COUNT))
+        n = jnp.int32(jnp.mod(i,TRAIN_VMAP_COUNT))
+        grad = jax.tree_util.tree_map(lambda x: x[m][n], grads)
+        st = st.apply_gradients(grads=grad)
+        return (st)
+
+    state = jax.lax.fori_loop(0, DEVICE_COUNT*TRAIN_VMAP_COUNT, gradient_application, state)
+
+    return state 
 
 
 def train_epoch(state, dl, epoch, key, training): 
+    state_dist = flax.jax_utils.replicate(state)
+
     running_loss = []
     running_loss_aux = [[], [], [], []]
-    dl.pin_memory_device = []
 
-    for i, dd in enumerate(dl):
-        for j in range(dd.x.shape[0] // N_JETS):
-            x = dd.x[N_JETS*j:N_JETS*(j+1), :, :]
-            y = dd.y[N_JETS*j:N_JETS*(j+1), :, :]
+    for i, d in enumerate(dl):
 
-            x = jnp.array(x)
-            y = jnp.array(y)
+        x = jnp.array(d.x, dtype=jnp.float64)
+        y = jnp.array(d.y, dtype=jnp.float64)
 
-            n_jets, n_tracks, _ = x.shape
 
-            batch = get_batch(x, y)
+        x = jax.tree_map(lambda m: m.reshape((DEVICE_COUNT, TRAIN_VMAP_COUNT, -1, *m.shape[1:])), x)
+        y = jax.tree_map(lambda m: m.reshape((DEVICE_COUNT, TRAIN_VMAP_COUNT, -1, *m.shape[1:])), y)
+        
+        if training:
+            loss, loss_tasks, grads = train_step_pmap(key, state_dist, x, y)
+            state = flax.jax_utils.unreplicate(state_dist)
+            state = update_model(state, grads)
+            state_dist = flax.jax_utils.replicate(state)
+        else:
+            loss, loss_tasks = eval_step_pmap(key, state_dist, x, y)
 
-            if training:
-                state, loss, loss_tasks = train_step(state, batch, key)
-            else:
-                loss, loss_tasks = eval_step(state.params, batch, key)
-            
-            running_loss.append(loss)
-            assert(len(loss_tasks) == 4)
-            for l in range(len(loss_tasks)):
-                running_loss_aux[l].append(loss_tasks[l])
+        running_loss.append(loss)
+        assert(len(loss_tasks) == 4)
+        for l in range(len(loss_tasks)):
+            running_loss_aux[l].append(loss_tasks[l])
 
     for l in range(len(running_loss_aux)):
         running_loss_aux[l] = jnp.mean(jnp.array(running_loss_aux[l])).item()
@@ -165,7 +155,10 @@ def train_epoch(state, dl, epoch, key, training):
         print('Validation - epoch: {}, loss: {}'.format(epoch, running_loss))
 
     print("(g, n, e, r) =", tuple(running_loss_aux))
-    return state, running_loss, running_loss_aux
+    if training:
+        return state, running_loss, running_loss_aux
+    else:
+        return running_loss, running_loss_aux
 
 
 def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0):
@@ -179,15 +172,14 @@ def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0):
     valid_losses = []
     train_losses_aux = []
     valid_losses_aux = []
-    import time
 
     # while epoch < 200:
     while True:
         current_secs = datetime.datetime.now().second
-        key_tracks = jax.random.PRNGKey(current_secs)
+        key = jax.random.PRNGKey(current_secs)
         t0 = time.time()
-        state, train_metrics, train_aux_metrics = train_epoch(state, train_dl, epoch, key_tracks, training=True)
-        state, valid_metrics, valid_aux_metrics = train_epoch(state, valid_dl, epoch, key_tracks, training=False)
+        state, train_metrics, train_aux_metrics = train_epoch(state, train_dl, epoch, key, training=True)
+        valid_metrics, valid_aux_metrics = train_epoch(state, valid_dl, epoch, key, training=False)
         t1 = time.time()
         print("TIME = ", t1 - t0)
         train_losses.append(float(train_metrics))
@@ -221,7 +213,7 @@ def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0):
             if counter_improvement == 5:
                 learning_rate = learning_rate / 10
                 counter_improvement = 0
-                state = create_train_state(None, learning_rate=learning_rate, model=model,  params=state.params)
+                state = create_train_state(None, learning_rate=learning_rate, model=model, params=state.params)
 
         if early_stop.should_stop:
             print('Met early stopping criteria, breaking...')
@@ -246,6 +238,7 @@ def parse_args():
     parser.add_argument('-input_dir', default=DEFAULT_DIR, help="Directory where the dataset in stored.")
     parser.add_argument('-input_suffix', default=DEFAULT_SUFFIX, help="Name of the dataset to be loaded.")
     parser.add_argument('-save_dir', default=DEFAULT_MODEL_DIR, help="Directory to store results.")
+    parser.add_argument('-batch_size', default=2500, type=int, help="Batch size")
     parser.add_argument('-ensemble_size', default=1, type=int, help="Number of instances to train")
     parser.add_argument('-dev', default=False, type=bool, help="Set to True to check dimensions etc")
     parser.add_argument('-save_plot_data', default=False, type=bool, help="Save final results for plotting?")
@@ -255,44 +248,38 @@ def parse_args():
     return parser.parse_args()
 
 
-def init_model(rng, model):
-    rng, init_rng = jax.random.split(rng)
-    state = create_train_state(init_rng, LR_INIT, model)
-    param_count = sum(x.size for x in jax.tree_util.tree_leaves(state.params))
-    print("Model and train state created")
-    print("Number of parameters:", param_count)
-    return rng, state
-
-
 if __name__ == "__main__":
     rng = jax.random.PRNGKey(42)
     opt = parse_args()
 
+
+    nominal_batch_size = 10000
+
+    DEVICE_COUNT = jax.device_count()
+
+    TRAIN_VMAP_COUNT = int(nominal_batch_size/DEVICE_COUNT/opt.batch_size)
+    TEST_VMAP_COUNT = int(nominal_batch_size/DEVICE_COUNT/opt.batch_size)
+
     if opt.dev:
         model = get_model(opt.model)
-        rng, state = init_model(rng)
+        rng, state = init_model(rng, model)
         print(type(model))
-        batch = {
-            'x': jnp.ones((N_JETS, 15, 18)), 
-            'jet_vtx': jnp.ones((N_JETS,3)), 
-            'trk_vtx': jnp.ones((N_JETS, 15, 3)), 
-            'jet_y': jnp.ones((N_JETS,3)),
-            'trk_y': jnp.ones((N_JETS, 15, 4)),
-            'edge_y': jax.nn.one_hot(jnp.ones((N_JETS, 15 ,15)).reshape(-1, 225), 2, axis=2),
-            'n_tracks': jnp.ones((N_JETS)),
-            'jet_phi': jnp.ones((N_JETS)),
-            'jet_theta': jnp.ones((N_JETS))
-        }
+        state_dist = flax.jax_utils.replicate(state)
+        x = jnp.ones([N_JETS, 15, 51])
+        y = jnp.ones([N_JETS, 15, 30])
+        x = jax.tree_map(lambda m: m.reshape((DEVICE_COUNT, TRAIN_VMAP_COUNT, -1, *m.shape[1:])), x)
+        y = jax.tree_map(lambda m: m.reshape((DEVICE_COUNT, TRAIN_VMAP_COUNT, -1, *m.shape[1:])), y)
+            
         k = jax.random.PRNGKey(1)
-        with jax.disable_jit():
-            print("train begin")
-            state, running_loss, aux_losses = train_step(state, batch, k)
-            print("train done", len(aux_losses), aux_losses)
-            print("eval begin")
-            eval_step(state.params, batch, k)
-            print("eval done")
-            # test_step(state.params, batch)
-            # print("test done")
+        # with jax.disable_jit():
+        print("train begin")
+        train_step_pmap(k, state_dist, x, y)
+        print("train done")
+        print("eval begin")
+        eval_step_pmap(k, state_dist, x, y)
+        print("eval done")
+        # test_step(state.params, batch)
+        # print("test done")
         exit(0)
 
     print("Loading datasets: start")

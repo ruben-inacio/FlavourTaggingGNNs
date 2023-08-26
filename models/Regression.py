@@ -33,7 +33,7 @@ class Regression(nn.Module):
         ])
 
     def __call__(self, x, repr_track, weights, mask, *args):
-        pooled, _ = self.pool(weights * repr_track, mask=mask)
+        pooled, _ = self.pool(weights * x, mask=mask)
         out_mean = self.mlp_mean(pooled)
         out_var = self.mlp_var(pooled)
         

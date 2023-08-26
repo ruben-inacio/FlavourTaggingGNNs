@@ -26,6 +26,7 @@ class TN1(nn.Module):
     augment:             bool
     strategy_prediction: str
     points_as_features:  bool
+    errors_as_features:  bool
     scale:               bool
     strategy_one_hot:    str
 
@@ -60,7 +61,7 @@ class TN1(nn.Module):
         else:	
             self.augment_fn = lambda *args: args[4]
 
-        if self.scale:
+        if self.scale:  # TODO FIXME out of date
             if self.points_as_features:
                 self.scaler=pickle.load(open("../training_data/scaler_30jun.npy",'rb'))
             else:
@@ -162,10 +163,10 @@ class TN1(nn.Module):
     def one_hot_encodings(self, x, mask, n_tracks, thresholds, inv=True):
         x = x[:, :, 0]
         x = jnp.where(mask[:, :, 0], x, thresholds * jnp.max(x, axis=1).reshape(-1, 1))
+        ids = jnp.argsort(x, axis=1)
         if inv:
-            ids = jnp.argsort(x, axis=1)[:, ::-1]
-        else:
-            ids = jnp.argsort(x, axis=1)
+            ids = ids[:, ::-1]
+
         ids = jax.nn.one_hot(ids, n_tracks)
         return ids
         # return jnp.ones([x.shape[0], x.shape[1], x.shape[1]])
@@ -180,7 +181,9 @@ class TN1(nn.Module):
             x_points = jnp.repeat(new_ref, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
             x_errors = jnp.repeat(new_ref_errors, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
             x_prime = jnp.concatenate([x_prime, x_points], axis=2)
-
+            if self.errors_as_features:
+                x_prime = jnp.concatenate([x_prime, x_errors], axis=2)
+                
         x_prime = self.scale_fn(x_prime)
         
         if self.strategy_one_hot is not None:
@@ -208,9 +211,13 @@ class TN1(nn.Module):
 
         if self.points_as_features:
             x_ = jnp.concatenate([x_, jnp.zeros(shape=(batch_size, max_tracks, 3))], axis=2)
+            if self.errors_as_features:
+                x_ = jnp.concatenate([x_, jnp.zeros(shape=(batch_size, max_tracks, 3))], axis=2)
+
 
         x_scaled = self.scale_fn(x_)
         
+        thresholds=None
         if self.strategy_one_hot is not None:
             if self.strategy_one_hot == "mlp":
                 thresholds = self.mlp_thresholds(x_scaled[:, :, 0])  # FIXME x_ or x_scaled?
@@ -218,7 +225,7 @@ class TN1(nn.Module):
             elif self.strategy_one_hot == "beta":
                 thresholds = jax.lax.stop_gradient(self.get_thresholds_beta(x, mask))
             elif self.strategy_one_hot == "none":
-                thresholds = jnp.zeros([x_.shape[0]])
+                thresholds = jnp.zeros([x_.shape[0], 1])
             ids = self.one_hot_encodings(x_scaled, mask, max_tracks, thresholds)
             x_scaled = jnp.concatenate([x_scaled, ids], axis=2)
 
@@ -227,7 +234,7 @@ class TN1(nn.Module):
         out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
         _, _, _, out_mean, out_var, out_chi = out_preds
         
-        repr_track = self.augment_fn(x, out_mean, out_var, t, g, mask, thresholds=thresholds)
+        repr_track = self.augment_fn(x, out_mean, out_var, t, g, mask, thresholds)
         # 
         # key = jax.random.PRNGKey(datetime.datetime.now().second)
         # out_var_diag = jax.lax.map(jnp.diag, out_var)
