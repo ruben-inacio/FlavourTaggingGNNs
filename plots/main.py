@@ -135,17 +135,17 @@ if __name__ == "__main__":
 
 
     labels = settings['labels_models']
-    if False and do_regression:
+    if do_regression:
         # Duplicate for jet_trks
-        # plot_discriminated_by_flavour(
-        #     predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, r"Jet $p_{T}$ [GeV]", labels, 'pt',[20, 40, 60, 80, 100, 200])
-        # plot_global_performance(
-        #     predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, r"Jet $p_{T}$ [GeV]", labels, 'pt', [20, 40, 60, 80, 100, 200])
+        plot_discriminated_by_flavour(
+            predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, r"Jet $p_{T}$ [GeV]", labels, 'pt',[20, 40, 60, 80, 100, 200])
+        plot_global_performance(
+            predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, r"Jet $p_{T}$ [GeV]", labels, 'pt', [20, 40, 60, 80, 100, 200])
         plot_discriminated_by_flavour(
             predictions_fitting, predictions_errors, true_vtx, true_graph, jet_trks, r"#Tracks", labels, 'ntrks', list(range(1, 16)))
         plot_global_performance(
             predictions_fitting, predictions_errors, true_vtx, true_graph, jet_trks, r"#Tracks", labels, 'ntrks', list(range(1, 16)))
-        # plot_fitting_average(predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, labels, [20, 40, 60, 80, 100, 200])
+        plot_fitting_average(predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, labels, [20, 40, 60, 80, 100, 200])
 
     if do_jet_roc:
         performance_roc_jets(predictions_graph_clf, true_graph, labels)

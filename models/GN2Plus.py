@@ -43,6 +43,12 @@ class TN1(nn.Module):
             heads = self.heads,
             architecture="post"
         )
+        # self.preprocessor2 = PreProcessor(
+        #     hidden_channels = self.hidden_channels,
+        #     layers = self.layers,
+        #     heads = self.heads,
+        #     architecture="post"
+        # )
         
         self.gate_nn = nn.Dense(features=1, param_dtype=jnp.float64)
         self.pool = GlobalAttention(gate_nn=self.gate_nn)
@@ -85,7 +91,8 @@ class TN1(nn.Module):
                 hidden_channels=    64,
                 layers=             3,
                 heads=              2,
-                strategy_sampling=  "compute",
+                strategy_sampling=  "none",
+                strategy_weights="compute",
                 method=             self.strategy_prediction
             )
         elif self.strategy_prediction is not None:
