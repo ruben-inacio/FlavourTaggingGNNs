@@ -6,7 +6,7 @@ host = str(subprocess.check_output(['hostname']))
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 if "lipml" in host:
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1" # "1"  # "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0" # "1"  # "0"
 
 import jax
 import functools
@@ -38,11 +38,6 @@ import json
 import pickle
 from train_utils import *
 
-# GLOBAL SETTINGS
-LR_INIT = 1e-3
-N_FEATURES = 18  # DO NOT CHANGE, TO BE REMOVED
-N_JETS = 2500 #0 
-N_TRACKS = 15
 
 
 @jax.jit

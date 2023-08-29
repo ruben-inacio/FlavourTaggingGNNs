@@ -24,6 +24,7 @@ class Predictor(nn.Module):
     heads: int
     strategy_weights: str
     strategy_sampling: str
+    use_weights_regression: bool
     method: str
 
     def setup(self):
@@ -47,7 +48,9 @@ class Predictor(nn.Module):
             self.sample_fn = lambda *args: jax.lax.stop_gradient(self.sample_fn(*args))
 
         if self.method == "regression":
-            self.fitting_method = Regression(hidden_channels=self.hidden_channels)
+            self.fitting_method = Regression(
+                hidden_channels=self.hidden_channels,
+                use_weights=self.use_weights_regression)
         else:
             self.fitting_method = lambda x, _, wv, mask: ndive(x, jnp.where(mask.squeeze(), wv.squeeze(), 1e-100), jnp.zeros([x.shape[0], 3]))
 

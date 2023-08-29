@@ -65,8 +65,9 @@ def assign_bins(results, jet_var, bins, mean=True):
         # bins_values[i] = np.mean(values_to_mean)
         if "nan" == str(bins_values[i]):
             # print(i, values_to_mean)
-            print("nan found")
-    print("BINS VALUES", bins_values)
+            # print("nan found")
+            pass
+    # print("BINS VALUES", bins_values)
     for i in range(len(bins)-2, 0, -1):
         bins_values.insert(i, bins_values[i-1])
         bins_values_std.insert(i, bins_values_std[i-1])

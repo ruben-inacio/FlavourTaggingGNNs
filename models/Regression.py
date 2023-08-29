@@ -11,6 +11,7 @@ except ModuleNotFoundError:
 
 class Regression(nn.Module):
     hidden_channels: int
+    use_weights: bool
 
     def setup(self):
         self.gate_nn = nn.Dense(features=1, param_dtype=jnp.float64)
@@ -33,7 +34,11 @@ class Regression(nn.Module):
         ])
 
     def __call__(self, x, repr_track, weights, mask, *args):
-        pooled, _ = self.pool(weights * x, mask=mask)
+        if self.use_weights:
+            pooled, _ = self.pool(weights * repr_track, mask=mask)
+            # pooled, _ = self.pool(weights * x, mask=mask)
+        else:
+            pooled, _ = self.pool(repr_track, mask=mask)
         out_mean = self.mlp_mean(pooled)
         out_var = self.mlp_var(pooled)
         

@@ -1,10 +1,10 @@
 {
     "results_dir": "../../plots2808",
     "models": [
-        "../../models/gn2",  "../../models/gn2_ndive",  "../../models/gn2_ndive_onehot_threshold_000_inv", "../../models/gn2_ndive_onehot_threshold_beta_inv"
+        "../../models/gn2",  "../../models/gn2_ndive",  "../../models/gn2_ndive_onehot_threshold_000_inv"
     ],
     "labels_models": [
-        "GN2", "GN2+A", "GN2+B", "GN2+C"
+        "GN2", "GN2+ A", "GN2+ B"
     ],
     "labels_graph": [
         "b", "c", "u"
@@ -14,9 +14,9 @@
         "Distinct"
     ],
     "labels_nodes":[
-        "Primary",
         "FromB",
         "FromC",
+        "Primary",
         "Other"
     ],
     "colors": [

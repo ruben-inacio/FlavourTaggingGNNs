@@ -15,9 +15,9 @@ DEFAULT_SUFFIX =  "alljets_fitting"
 DEFAULT_MODEL_DIR = "../models_v2" #"../models" 
 
 # GLOBAL SETTINGS
-LR_INIT = 1e-3
+LR_INIT = 1e-3 #1e-3
 N_FEATURES = 18  # DO NOT CHANGE, TO BE REMOVED
-N_JETS = 2500 #0 
+N_JETS = 250 #0 
 N_TRACKS = 15
 
 def get_batch(x, y):
@@ -90,12 +90,16 @@ def create_train_state(rng, learning_rate, model=None, params=None):
             params = unfreeze(params)
             with open(f"../models/ndive/params_0.pickle", 'rb') as fp:
                 ndive_params = pickle.load(fp)
-            params['apply_strategy_prediction_fn'] = ndive_params
+            # params['apply_strategy_prediction_fn'] = ndive_params
             params = freeze(params)
         else:
             print("Predictor only")
-    tx = optax.adam(learning_rate=learning_rate)
-    # tx = optax.novograd(learning_rate=learning_rate)
+    # tx = optax.adam(learning_rate=learning_rate)
+    tx = optax.novograd(learning_rate=learning_rate)
+    # tx = optax.chain(
+    #     optax.adam(learning_rate=learning_rate),
+    #     optax.novograd(learning_rate=learning_rate)
+    # )
     print("CREATING TRAIN STATE WITH LR =", learning_rate)
 
     return train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx)

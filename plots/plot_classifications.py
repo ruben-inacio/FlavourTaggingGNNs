@@ -12,6 +12,8 @@ from scipy import interpolate
 import numpy as np
 import argparse
 import json
+from plot_vertex_fitting import assign_bins
+import copy
 
 font = {'family' : 'sans-serif',
         'size'   : 16}
@@ -23,7 +25,7 @@ def plot_confusion_matrix(predictions, targets, classes, name, save_dir):
     
     predictions = np.argmax(predictions, axis=1) 
     conf_matrix = confusion_matrix(targets, predictions, normalize="true", labels=list(range(len(classes))))
-    disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=classes).plot()
+    disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=classes).plot(cmap='Blues')
     plt.tight_layout()
     plt.savefig(f"{save_dir}/confusion_matrix_{name}.pdf")
     plt.close()
@@ -35,7 +37,7 @@ def plot_standard_roc(predictions, targets, classes, name, save_dir):
     for pos_class in range(len(classes)):
         fpr_node, tpr_node, _ = roc_curve(targets, predictions[:, pos_class], pos_label=pos_class)
         roc_auc = auc(fpr_node, tpr_node)
-        plt.plot(fpr_node,tpr_node,lw=2, label="ROC curve class %d (area = %0.2f)" % (pos_class,roc_auc))
+        plt.plot(fpr_node,tpr_node,lw=2, label="%s (AUC = %0.2f)" % (classes[pos_class],roc_auc))
 
     plt.plot([0, 1], [0, 1], color="navy", lw=1, linestyle="--")
     plt.xlim([0.0, 1.0])
@@ -227,6 +229,186 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
     
     return    
 
+def compare_models_eff_ATLASv2(jet_results, colors, save_dir, labels, jet_var, *args):
+    print(np.array(jet_results).shape)
+    for t in range(len(jet_results)):
+        bins_values_aux = []
+        bins_values_std_aux = []
+        for inst in range(len(jet_results[t])):
+            print(jet_results[t][inst].shape)
+            m, std = assign_bins(jet_results[t][inst], jet_var=jet_var[t], bins=bins)
+            bins_values_aux.append(m)
+            bins_values_std_aux.append(std)
+        bins_values_aux = np.array(bins_values_aux)
+        bins_values_std_aux = np.array(bins_values_std_aux)
+
+        bins_values_mean.append(bins_values_aux.mean(axis=0))
+        bins_values_std.append(bins_values_std_aux.mean(axis=0))
+
+    for m, model_results in enumerate(jet_results):
+        pass
+    exit(0)
+
+def compute_threshold(jet_flavours, discriminator, rejection_threshold=45.0, rejection_type='u'):
+    if type(jet_flavours) != np.ndarray:
+        jet_flavours = np.array(jet_flavours)
+    if type(discriminator) != np.ndarray:
+        discriminator = np.array(discriminator)
+    print(discriminator.shape)
+    cjet = discriminator[jet_flavours==1]
+    ujet = discriminator[jet_flavours==2]
+    values = cjet if rejection_type == "c" else ujet
+
+    n, bins = np.histogram(values, bins=np.linspace(np.min(discriminator),np.max(discriminator),200), density=True)
+    
+    # Compute rejection
+    bkg_num = np.cumsum(n[::-1])[::-1] 
+    bkg_denom = bkg_num.max()
+    bkg_eff = bkg_num / bkg_denom
+    bkg_rej = np.zeros_like(bkg_eff)
+    valid = bkg_eff > 0.0
+    bkg_rej[valid] = 1 / bkg_eff[valid]  # should be: 1/eps = x <=> 1 = x*eps <=> 1 - eps = (x-1)*eps?
+
+    # closest_idx = 0
+    # for i in range(len(bkg_rej)):
+    #     if (bkg_rej[i] - 1) * rejection_threshold > 1 - rejection_threshold:
+    #         closest_idx += 1
+    bins = bins[:-1]
+    scores = interpolate.interp1d(
+        bkg_rej,
+        bins,
+        bounds_error=False
+    )
+
+    return scores(rejection_threshold)
+
+
+def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet_true, bins, var, var_label):
+    def get_discriminator(results):
+        f = 0.05
+        results = np.array(results)
+        print(results.shape)
+        pb = np.array(results[:,0],dtype=np.float128)
+        pc = np.array(results[:,1],dtype=np.float128)
+        pu = np.array(results[:,2],dtype=np.float128)
+
+        denom = (1-f)*pu + f*pc
+        valid1 = ( denom != 0 ) 
+        valid2 = ( pb != 0 ) & ( np.isfinite(pb) )
+        discriminator = np.empty_like(pb)
+        discriminator[valid1&valid2] = np.log( np.divide(pb[valid1&valid2],denom[valid1&valid2]))
+        maxval = np.max(discriminator[valid1&valid2])
+        minval = np.min(discriminator[valid1&valid2])
+        discriminator[~valid1] = maxval
+        discriminator[~valid2] = minval
+
+        return discriminator, pb, pc, pu
+
+    fig, ax = plt.subplots(2, figsize=(8,8), gridspec_kw={'height_ratios': [2, 1]})
+    
+    jet_min = jet_var.min().item()
+    jet_max = jet_var.max().item()
+
+    jet_bins = []
+    bins_true = []
+    number_bins = len(bins) - 1
+    # Assign each jet to a bin
+    for i in range(len(jet_var)):
+        for j in range(len(bins)-1):
+            if j < len(bins) - 2 and jet_var[i] >= bins[j] and jet_var[i] < bins[j+1]:
+                jet_bins.append(j)
+                break
+            elif j == len(bins) - 2 and jet_var[i] >= bins[j] and jet_var[i] <= bins[j+1]:
+                jet_bins.append(j)
+
+    for i in range(number_bins):
+        bins_true.append([])
+
+    for i in range(len(jet_bins)):
+        bins_true[jet_bins[i]].append(jet_true[i].item())
+    
+    for i in range(number_bins):
+        bins_true[i] = np.array(bins_true[i])
+
+    # Prepare to plot x-axis
+    for i in range(len(bins)-2, 0, -1):
+        bins.insert(i, bins[i])
+
+
+    # Get discriminator scores for each run + model
+    for m, models_results in enumerate(jet_results):
+        for r, run_results in enumerate(models_results):
+            discriminator = get_discriminator(run_results)
+            discriminator = discriminator[0]
+
+            results = []
+            for i in range(number_bins):
+                results.append([])
+
+            for i in range(len(jet_var)):
+                results[jet_bins[i]].append(discriminator[i])
+            
+            
+            jet_results[m][r] = []
+            for i in range(number_bins):
+                jet_results[m][r].append(results[i])
+
+
+    models_acc = []
+    for m, model_results in enumerate(jet_results):
+        model_acc = []
+        for r, results in enumerate(model_results): # each sample of the model
+            acc = []
+            for b in range(number_bins):
+                results[b] = np.array(results[b])
+                D = compute_threshold(bins_true[b], results[b])
+                assert(results[b].shape == bins_true[b].shape)
+                res = results[b][bins_true[b] == 0]
+                acc.append(len(res[res > D]) / len(res))
+            model_acc.append(np.array(acc))
+
+        model_acc_mean_aux = np.mean(np.array(model_acc), axis=0)
+        model_acc_std_aux = np.std(np.array(model_acc), axis=0)
+        model_acc_mean = []
+        model_acc_std = []
+        for i in range(len(model_acc_mean_aux)):
+	        model_acc_mean.append(model_acc_mean_aux[i])
+	        model_acc_mean.append(model_acc_mean_aux[i])
+	        model_acc_std.append(model_acc_std_aux[i])
+	        model_acc_std.append(model_acc_std_aux[i])
+        model_acc_mean = np.array(model_acc_mean)
+        model_acc_std = np.array(model_acc_std)
+        print(model_acc_mean)
+        ax[0].plot(bins, model_acc_mean, label=labels[m], color=colors[m])
+        std_upper = model_acc_mean + model_acc_std
+        std_lower = model_acc_mean - model_acc_std
+        ax[0].fill_between(bins, std_lower, std_upper, color=colors[m], alpha=0.2)
+
+        models_acc.append(model_acc_mean)
+
+    ax[0].set_ylabel("b-jet tagging efficiency")
+    ax[0].set_xlim(jet_min,jet_max)
+    ax[0].set_ylim(0.6, 1)
+    ax[0].legend(loc="lower right")
+
+    # Ratio panel (denominator is always first model)
+    baseline_acc = models_acc[0]    
+    for r in range(len(jet_results)):
+        model_acc = models_acc[r]
+        ratio = model_acc / baseline_acc
+        ax[1].plot(bins, ratio, color=colors[r], label=labels[r])
+
+    ax[1].set_xlabel(var_label)
+    ax[1].set_ylabel("Ratio to " + labels[0])
+    ax[1].set_xlim(jet_min,jet_max)
+    # ax[1].legend(loc="best")
+    plt.tight_layout()
+
+
+    plt.savefig(f"{save_dir}/ATLAS_eff_ensemble_{var}.pdf")
+
+    plt.close()
+    return 
 
 # High-level functions
 def plot_classifications(predictions, targets, labels, labels_key):
@@ -253,12 +435,13 @@ def plot_classifications(predictions, targets, labels, labels_key):
 
 
 
-def performance_roc_jets(predictions, true_flavours, labels):
+def performance_cmp_jets(predictions, true_flavours, labels, jet_pts):
 
     results = []
     for t in range(len(predictions)):
         model_results = []
         for inst in range(len(predictions[t])):
+            # data: (efficiency, c-rejection, u-rejection)
             data = prepare_ROC_jet_ATLAS_bcujets(predictions[t][inst], true_flavours)
             model_results.append(list(data))
             
@@ -270,4 +453,5 @@ def performance_roc_jets(predictions, true_flavours, labels):
         colors = settings['colors']
 
     compare_models_jet_ATLAS(results, colors, results_dir, labels)
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_pts, true_flavours, [20, 40, 60, 80, 100, 200], "pt", r"Jet $p_{T}$ [GeV]")
 

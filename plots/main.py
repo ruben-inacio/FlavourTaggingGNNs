@@ -29,7 +29,7 @@ def parse_args():
 if __name__ == "__main__":
     opt = parse_args()
     do_regression = opt.regression
-    do_jet_roc = opt.atlas_roc
+    do_jet_cmp = opt.atlas_roc
     do_classifications = opt.classifications
     
     with open("configs.json", "r") as f:
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
             except Exception as e:
                 print("ATLAS ROC, classification plots disabled.")
-                do_jet_roc = False
+                do_jet_cmp = False
                 do_classifications = False
             
             try:
@@ -147,8 +147,8 @@ if __name__ == "__main__":
             predictions_fitting, predictions_errors, true_vtx, true_graph, jet_trks, r"#Tracks", labels, 'ntrks', list(range(1, 16)))
         plot_fitting_average(predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, labels, [20, 40, 60, 80, 100, 200])
 
-    if do_jet_roc:
-        performance_roc_jets(predictions_graph_clf, true_graph, labels)
+    if do_jet_cmp:
+        performance_cmp_jets(predictions_graph_clf, true_graph, labels, jet_pts)
 
     if do_classifications:
         plot_classifications(predictions_graph_clf, true_graph, labels, "graph")

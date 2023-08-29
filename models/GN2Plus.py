@@ -93,6 +93,7 @@ class TN1(nn.Module):
                 heads=              2,
                 strategy_sampling=  "none",
                 strategy_weights="compute",
+                use_weights_regression=False,
                 method=             self.strategy_prediction
             )
         elif self.strategy_prediction is not None:
@@ -238,7 +239,8 @@ class TN1(nn.Module):
 
         t, g = self.preprocessor(x_scaled, mask)
             
-        out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
+        out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
+        # out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
         _, _, _, out_mean, out_var, out_chi = out_preds
         
         repr_track = self.augment_fn(x, out_mean, out_var, t, g, mask, thresholds)
