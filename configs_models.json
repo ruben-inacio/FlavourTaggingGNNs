@@ -4,11 +4,11 @@
         "layers": 3,
         "heads": 2,
         "augment": true,
-        "strategy_prediction": "fit",
+        "strategy_prediction": "none",
         "points_as_features": true,
         "errors_as_features": false,
         "scale": false,
-        "strategy_one_hot": null
+        "strategy_one_hot": "none"
     },
     "predictor": {
         "hidden_channels": 64,

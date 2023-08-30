@@ -277,8 +277,8 @@ class TN1(nn.Module):
         out_edges = self.mlp_edges(repr_vtx)
         assert(out_edges.shape == (batch_size, max_tracks**2, 2))
         out_edges = nn.softmax(out_edges, axis=2)
-
-        return out_graph, out_nodes, out_edges, out_mean, out_var, out_chi
+        # FIXME may work only on analysis
+        return out_graph, out_nodes, out_edges, out_mean, out_var, out_chi #, t
 
     def loss(self, out, batch, mask_nodes, mask_edges):
         out_graph, out_nodes, out_edges, out_mean, out_var, out_chi = out
@@ -301,7 +301,7 @@ class TN1(nn.Module):
             loss_predictor = jnp.mean(loss_predictor)
         else:
             loss_predictor = 0
-        loss = loss_graph + 0.5 * loss_nodes + 1.5 * loss_edges # + 0.1 * loss_predictor
+        loss = loss_graph + 0.5 * loss_nodes + 1.5 * loss_edges + 0.1 * loss_predictor
 
         losses_aux = (loss_graph, loss_nodes, loss_edges, loss_predictor)
 

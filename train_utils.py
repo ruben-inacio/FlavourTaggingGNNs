@@ -1,18 +1,28 @@
+import os
+os.environ[ 'MPLCONFIGDIR' ] = '/tmp/$USER/'
+import datetime
+import subprocess  # to check if running at lipml
+host = str(subprocess.check_output(['hostname']))
+
 import jax.numpy as jnp
 import jax
 import json
 from models.Predictor import Predictor
 from models.GN2Plus import TN1
-from models.GN2Simple import TN1SimpleEnsemble
 from utils.layers import *
 import optax       
 from flax.training import train_state, checkpoints
 from flax.core import freeze, unfreeze
 import pickle
+import copy
 
-DEFAULT_DIR = "/lstore/titan/miochoa/TrackGeometry2023/RachelDatasets_Jun2023/all_flavors/all_flavors" 
+if "lipml" in host:
+    DEFAULT_DIR = "/lstore/titan/miochoa/TrackGeometry2023/RachelDatasets_Jun2023/all_flavors/all_flavors" 
+else:
+    DEFAULT_DIR = '/gpfs/slac/atlas/fs1/d/recsmith/Vertexing/samples/all_flavors/all_flavors'
+
 DEFAULT_SUFFIX =  "alljets_fitting"
-DEFAULT_MODEL_DIR = "../models_v2" #"../models" 
+DEFAULT_MODEL_DIR = "../models" #"../models" 
 
 # GLOBAL SETTINGS
 LR_INIT = 1e-3 #1e-3
@@ -72,6 +82,25 @@ def get_init_input():
     return batch, mask
 
 
+def mark_params(params, flag):
+    for k, v in params.items():
+        if not isinstance(v, dict):
+            params[k] = flag
+        else:
+            params[k] = mark_params(params[k], flag)
+    return params
+
+
+def mask_predictor(params):
+    params['mlp_graph'] = mark_params(params['mlp_graph'], False)
+    params['mlp_nodes'] = mark_params(params['mlp_nodes'], False)
+    params['mlp_edges'] = mark_params(params['mlp_edges'], False)
+    params['gate_nn'] = mark_params(params['gate_nn'], False)
+    params['preprocessor'] = mark_params(params['preprocessor'], False)
+    params['apply_strategy_prediction_fn'] = mark_params(params['apply_strategy_prediction_fn'], True)
+    return params
+
+
 def create_train_state(rng, learning_rate, model=None, params=None):
     if params is None:  # Initialise the model
         batch, mask = get_init_input()
@@ -94,6 +123,19 @@ def create_train_state(rng, learning_rate, model=None, params=None):
             params = freeze(params)
         else:
             print("Predictor only")
+    
+    # if "apply_strategy_prediction_fn" in params.keys():
+
+    # params = unfreeze(params)
+    # mask_pred = mask_predictor(copy.deepcopy(unfreeze(params)))
+    # mask_others = jax.tree_map(lambda x: not x, mask_pred)
+
+    # tx = optax.chain(
+    #     optax.masked(optax.novograd(learning_rate=learning_rate), mask_pred),
+    #     optax.masked(optax.adam(learning_rate=learning_rate), mask_others)
+    # )
+        
+    
     # tx = optax.adam(learning_rate=learning_rate)
     tx = optax.novograd(learning_rate=learning_rate)
     # tx = optax.chain(

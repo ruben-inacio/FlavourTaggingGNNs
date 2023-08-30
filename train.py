@@ -28,7 +28,6 @@ from functools import partial
 # from jax_models import TN1, mask_tracks, Predictor
 from models.Predictor import Predictor
 from models.GN2Plus import TN1
-from models.GN2Simple import TN1SimpleEnsemble
 from utils.layers import *
 
 import numpy as np
