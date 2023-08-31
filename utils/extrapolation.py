@@ -85,13 +85,10 @@ def extrapolate_tracks_to_vertex(tracks,vertex):
     new_p_d0 = new_p_d0 * sign_d0
 
     new_p_z0 = new_p_z - new_ref_z
-
-    new_perigee_params = jnp.concatenate(
-        (new_p_x,new_p_y,new_p_z,new_p_d0,new_p_z0,new_p_phi,new_p_theta,new_p_rho,),
-        axis = 1,
-    )
-
-    return new_perigee_params
+    
+    new_perigee_params = jnp.concatenate((new_p_d0,new_p_z0,new_p_phi),axis = 1)
+    out = jnp.concatenate([tracks[:,daf.TRACK_PT:daf.JetData.TRACK_PT+1], new_perigee_params, tracks[:, daf.JetData.TRACK_THETA:]], axis=1)
+    return out
 
 extrapolation_vmapped = jax.jit(
     jax.vmap(extrapolate_tracks_to_vertex,in_axes=(0, 0), out_axes=(0))

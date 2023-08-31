@@ -136,6 +136,7 @@ def create_train_state(rng, learning_rate, model=None, params=None):
     # )
         
     
+    # tx = optax.adamw(learning_rate=learning_rate)
     # tx = optax.adam(learning_rate=learning_rate)
     tx = optax.novograd(learning_rate=learning_rate)
     # tx = optax.chain(
