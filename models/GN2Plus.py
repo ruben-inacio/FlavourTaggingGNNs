@@ -88,13 +88,14 @@ class TN1(nn.Module):
             #     method=             self.strategy_prediction
             # )
             self.apply_strategy_prediction_fn = Predictor(
-                hidden_channels=    64,
-                layers=             3,
-                heads=              2,
-                strategy_sampling=  "none",
-                strategy_weights="compute",
-                use_weights_regression=False,
-                method=             self.strategy_prediction
+                hidden_channels=         self.hidden_channels, #64,
+                layers=                  self.layers,  #3,
+                heads=                   self.heads,  #2,
+                strategy_sampling=       "none",
+                strategy_weights=        "compute",
+                use_weights_regression = False,
+                use_ghost_track=         False,
+                method=                  self.strategy_prediction
             )
         elif self.strategy_prediction is not None:
             self.apply_strategy_prediction_fn = eval("self.apply_prediction_" + self.strategy_prediction)

@@ -6,16 +6,11 @@ import jax.numpy as jnp
 from flax import linen as nn  
 import jax
 import datetime
-try: 
-    from FlavourTaggingGNNs.models.PreProcessor import PreProcessor
-    from FlavourTaggingGNNs.models.Regression import Regression
-    from FlavourTaggingGNNs.utils.fit import ndive
-    from FlavourTaggingGNNs.utils.losses import *
-except ModuleNotFoundError:
-    from models.PreProcessor import PreProcessor
-    from models.Regression import Regression
-    from utils.fit import ndive
-    from utils.losses import *
+from models.PreProcessor import PreProcessor
+from models.Regression import Regression
+from utils.fit import ndive
+import utils.data_format as daf
+from utils.losses import *
 
 
 class Predictor(nn.Module):
@@ -25,6 +20,7 @@ class Predictor(nn.Module):
     strategy_weights: str
     strategy_sampling: str
     use_weights_regression: bool
+    use_ghost_track: bool
     method: str
 
     def setup(self):
@@ -89,60 +85,67 @@ class Predictor(nn.Module):
 
         return weights
 
-    # def __call__(self, tracks, key):
-    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta):
+    def add_ghost_track(self, x, mask, n_tracks, jet_phi, jet_theta):
+        num_jets, max_num_tracks, _ = x.shape
+
         new_track = jnp.stack([
             jnp.array([
                 0.,
                 0.,
                 0.,
-                phi,
-                theta,
-                0.,
-                0.,
-                0.,
-                0.,
-                jnp.mean(d_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
-                jnp.mean(z_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
-                jnp.mean(p_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
-                jnp.mean(t_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
-                jnp.mean(r_o, where=(jnp.arange(start=0, stop=15, step=1, dtype=jnp.int32) < n)),
-                0.,
-                0.,
-            ]) for n,phi,theta,d_o,z_o,p_o,t_o,r_o in zip(
-                n_tracks,
                 jet_phi,
                 jet_theta,
-                x[:,:,9],
-                x[:,:,10],
-                x[:,:,11],
-                x[:,:,12],
-                x[:,:,13],
+                0.,
+                0.,
+                0.,
+                0.,
+                jnp.mean(d_o, where=jnp.arange(0, max_num_tracks, dtype=jnp.int32) < n),
+                jnp.mean(z_o, where=jnp.arange(0, max_num_tracks, dtype=jnp.int32) < n),
+                jnp.mean(p_o, where=jnp.arange(0, max_num_tracks, dtype=jnp.int32) < n),
+                jnp.mean(t_o, where=jnp.arange(0, max_num_tracks, dtype=jnp.int32) < n),
+                jnp.mean(r_o, where=jnp.arange(0, max_num_tracks, dtype=jnp.int32) < n),
+                0.,
+                0.,
+                jnp.log(pt),
+                eta,
+            ]) for n,d_o,z_o,p_o,t_o,r_o,pt,eta in zip(
+                n_tracks,
+                x[:,:,daf.JetData.TRACK_D0_ERR],
+                x[:,:,daf.JetData.TRACK_Z0_ERR],
+                x[:,:,daf.JetData.TRACK_PHI_ERR],
+                x[:,:,daf.JetData.TRACK_THETA_ERR],
+                x[:,:,daf.JetData.TRACK_RHO_ERR],
+                x[:,0,daf.JetData.TRACK_JET_PT],
+                x[:,0,daf.JetData.TRACK_JET_ETA],
             )
-        ]).reshape(x.shape[0],1,16)
+        ]).reshape(num_jets,1,daf.NUM_JET_INPUT_PARAMETERS)
 
         mask = jnp.concatenate([jnp.ones((x.shape[0], 1, 1)).astype(bool), mask], axis=1)
-        x = jnp.concatenate((new_track, x[:,:,0:16]),axis=1)
+        x = jnp.concatenate((new_track, x[:,:,0:daf.NUM_JET_INPUT_PARAMETERS]),axis=1)
+        
+        return x, mask
 
-        # idx = jax.random.permutation(key, k)
-        # return_idx = jnp.argsort(idx)
-        # tracks = tracks[:,idx]
-        # mask = mask[:,idx]
+    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta):
+        num_jets, max_num_tracks, _ = x.shape
 
-        # x = tracks
+        if self.use_ghost_track:
+            x, mask = self.add_ghost_track(x, mask, n_tracks, jet_phi, jet_theta)
+        
         t, g = self.preprocessor(x, mask)
 
-        repr_track = jnp.concatenate([t, g], axis=2)
+        repr_track = g #jnp.concatenate([t, g], axis=2)
 
-        weights = self.apply_strategy_weights_fn(repr_track, mask, true_jet, true_trk)            
+        weights = self.apply_strategy_weights_fn(repr_track, mask, true_jet, true_trk)   
+        weights = jnp.where(mask, weights, 1e-100)   
         out_mean, out_var, out_chi = self.fitting_method(x, repr_track, weights, mask)
-        
+
         out_mean = jnp.clip(out_mean, a_min=-4000., a_max=4000.)
         out_mean = jnp.nan_to_num(out_mean, nan=4000., posinf=4000., neginf=-4000.)
         out_var = jnp.nan_to_num(out_var, nan=1000., posinf=1000., neginf=1000.)
-
+        out_var = jax.lax.stop_gradient(out_var)
         if out_chi is not None:
-            out_var = jnp.nan_to_num(out_var, nan=1000., posinf=1000., neginf=1000.)
+            out_chi = jnp.nan_to_num(out_chi, nan=1000., posinf=1000., neginf=1000.)
+            out_chi = jax.lax.stop_gradient(out_chi)
 
         # weights = weights[:, return_idx]
         return None, None, None, out_mean, out_var, out_chi

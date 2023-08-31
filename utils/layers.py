@@ -166,7 +166,8 @@ class GATLayer(nn.Module):
 def mask_tracks(x, n_trks):
     # Track-level mask
     mask = jnp.stack([
-        jnp.where(jnp.array(list(range(15))) < n, True, False)
+        jnp.where(jnp.array(list(range(15))) < n, 1, 0)
+        # jnp.where(jnp.array(list(range(15))) < n, True, False)
         for n in n_trks
     ])
     mask = mask.reshape(*mask.shape, 1)
@@ -174,7 +175,8 @@ def mask_tracks(x, n_trks):
     r = jnp.stack([jnp.array(list(list(range(15)) for i in list(range(15))))])[0]
     l = r.T
     mask_edges = jnp.stack([
-        jnp.where((r < n) & (l < n), True, False)
+        jnp.where((r < n) & (l < n), 1, 0)
+        # jnp.where((r < n) & (l < n), True, False)
         for n in n_trks
     ])  
     mask_edges = jnp.tril(mask_edges)

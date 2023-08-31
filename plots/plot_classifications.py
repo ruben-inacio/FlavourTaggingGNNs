@@ -15,9 +15,12 @@ import json
 from plot_vertex_fitting import assign_bins
 import copy
 
-font = {'family' : 'sans-serif',
-        'size'   : 16}
-plt.rc('font', **font)
+def reset_font():
+    font = {'family' : 'sans-serif',
+            'size'   : 16}
+    plt.rc('font', **font)
+
+reset_font()
 
 # Auxiliary functions
 def plot_confusion_matrix(predictions, targets, classes, name, save_dir):
@@ -283,26 +286,28 @@ def compute_threshold(jet_flavours, discriminator, rejection_threshold=45.0, rej
     return scores(rejection_threshold)
 
 
+def get_discriminator(results):
+    f = 0.05
+    results = np.array(results)
+    # print(results.shape)
+    pb = np.array(results[:,0],dtype=np.float128)
+    pc = np.array(results[:,1],dtype=np.float128)
+    pu = np.array(results[:,2],dtype=np.float128)
+
+    denom = (1-f)*pu + f*pc
+    valid1 = ( denom != 0 ) 
+    valid2 = ( pb != 0 ) & ( np.isfinite(pb) )
+    discriminator = np.empty_like(pb)
+    discriminator[valid1&valid2] = np.log( np.divide(pb[valid1&valid2],denom[valid1&valid2]))
+    maxval = np.max(discriminator[valid1&valid2])
+    minval = np.min(discriminator[valid1&valid2])
+    discriminator[~valid1] = maxval
+    discriminator[~valid2] = minval
+
+    return discriminator, pb, pc, pu
+
+
 def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet_true, bins, var, var_label):
-    def get_discriminator(results):
-        f = 0.05
-        results = np.array(results)
-        print(results.shape)
-        pb = np.array(results[:,0],dtype=np.float128)
-        pc = np.array(results[:,1],dtype=np.float128)
-        pu = np.array(results[:,2],dtype=np.float128)
-
-        denom = (1-f)*pu + f*pc
-        valid1 = ( denom != 0 ) 
-        valid2 = ( pb != 0 ) & ( np.isfinite(pb) )
-        discriminator = np.empty_like(pb)
-        discriminator[valid1&valid2] = np.log( np.divide(pb[valid1&valid2],denom[valid1&valid2]))
-        maxval = np.max(discriminator[valid1&valid2])
-        minval = np.min(discriminator[valid1&valid2])
-        discriminator[~valid1] = maxval
-        discriminator[~valid2] = minval
-
-        return discriminator, pb, pc, pu
 
     fig, ax = plt.subplots(2, figsize=(8,8), gridspec_kw={'height_ratios': [2, 1]})
     
@@ -410,6 +415,55 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
     plt.close()
     return 
 
+
+def compare_models_discriminator_ATLAS(jet_results, jet_true, save_dir, labels):
+    font = {'family' : 'sans-serif',
+        'size'   : 14}
+    plt.rc('font', **font)
+    discriminators_b = []
+    discriminators_c = []
+    discriminators_u = []
+
+    for t in range(len(jet_results)):
+        discriminators_model = []
+        for inst in range(len(jet_results[t])):
+            d_inst = get_discriminator(jet_results[t][inst])[0]
+            discriminators_model.append(d_inst)
+        discriminators_model = np.array(discriminators_model)
+        discriminator_model = np.mean(discriminators_model, axis=0)
+        jets_b = jet_true == 0
+        jets_c = jet_true == 1
+        jets_u = jet_true == 2
+        discriminators_u.append(discriminator_model[jets_u])
+        discriminators_c.append(discriminator_model[jets_c])
+        discriminators_b.append(discriminator_model[jets_b])
+    
+    for t in range(1, len(jet_results)):
+        fig = plt.figure(figsize=(6, 4), dpi=100)
+        ax = fig.add_subplot(111)
+
+        fc = 0.05
+        bins = np.linspace(-5,8,50)
+
+        ax.hist(discriminators_u[0], bins=bins, histtype='step', color='blue', label='u '+labels[0], linestyle='-', density=True)
+        ax.hist(discriminators_c[0], bins=bins, histtype='step', color='green', label='c '+labels[0], linestyle='-', density=True)
+        ax.hist(discriminators_b[0], bins=bins, histtype='step', color='red', label='b '+labels[0], linestyle='-', density=True)
+
+        ax.hist(discriminators_u[t], bins=bins, histtype='step', color='blue', label='u '+labels[t], linestyle=':', density=True)
+        ax.hist(discriminators_c[t], bins=bins, histtype='step', color='green', label='c '+labels[t], linestyle=':', density=True)
+        ax.hist(discriminators_b[t], bins=bins, histtype='step', color='red', label='b '+labels[t], linestyle=':', density=True)
+
+        ax.legend(bbox_to_anchor=(1.0, 1.03), loc="upper left")
+
+        ax.set_xlabel('$D_b$', fontsize = 14)
+        ax.set_ylabel('a.u.', fontsize = 14)
+        ax.set_yscale("log")
+        plt.tight_layout()
+        plt.savefig(f"{save_dir}/discriminator_{labels[0]}_vs_{labels[t]}.pdf")
+
+    reset_font()
+    exit(0)
+
 # High-level functions
 def plot_classifications(predictions, targets, labels, labels_key):
     predictions = np.array(predictions)
@@ -452,6 +506,6 @@ def performance_cmp_jets(predictions, true_flavours, labels, jet_pts):
         results_dir = settings['results_dir']
         colors = settings['colors']
 
+    compare_models_discriminator_ATLAS(predictions, true_flavours, results_dir, labels)
     compare_models_jet_ATLAS(results, colors, results_dir, labels)
     compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_pts, true_flavours, [20, 40, 60, 80, 100, 200], "pt", r"Jet $p_{T}$ [GeV]")
-

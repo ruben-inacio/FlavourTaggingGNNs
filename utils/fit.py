@@ -1,22 +1,123 @@
+""" Computes a vertex fit on batched track data using Billoir algorithm.
+
+Results in singular exported function: ndive. 
+    This computes a vertex fit on batched track data according to user-provided
+        track weights and vertex seed.
+    The function is wrapped into a differentiable jax function and can be placed inside
+        any larger jax / flax function.
+
+code follows: https://www.sciencedirect.com/science/article/pii/0168900292908593
+"""
 import jax
-import jax.numpy as jnp     
+import jax.numpy as jnp
 from jax.config import config
+import utils.data_format as daf
 config.update("jax_enable_x64", True)
 
+
+def get_qmeas(track):
+    """ return measured perigee track parameters for given track
+
+    Args:
+        track: dim 'num_track_inputs' sized array
+    Returns:
+        'num_perigee_params' x 1 array containing track measurements
+    """
+    d0     = track[daf.JetData.TRACK_D0]
+    z0     = track[daf.JetData.TRACK_Z0]
+    phi    = track[daf.JetData.TRACK_PHI]
+    theta  = track[daf.JetData.TRACK_THETA]
+    rho    = track[daf.JetData.TRACK_RHO]
+    q = jnp.stack([d0, z0, phi, theta, rho]).reshape(-1, 1)
+
+    return q
+
+
+def get_qpred(rv, pv):
+    """ return predicted track parameters given vertex of measurement and predicted mtm
+
+    Extrapolates track parameters from fit vertex to origin
+    Args:
+        rv: x, y, z coordinates for vertex 
+        pv: momentum of track in phi, theta, rho coordinates
+    Returns:
+        'num_perigee_params' x 1 array containing extrapolated track params
+    """
+    phiv = pv[0]
+    theta = pv[1]
+    rho = pv[2]
+
+    Q = rv[0]*jnp.cos(phiv) + rv[1]*jnp.sin(phiv)
+    R = rv[1]*jnp.cos(phiv) - rv[0]*jnp.sin(phiv)
+
+    h1 = -R - Q**2 * (rho)/2
+    h2 = rv[2] - Q*(1-R*(rho))/jnp.tan(theta)
+    h3 = phiv - Q*(rho)
+    h4 = theta
+    h5 = rho
+    h = jnp.stack([h1,h2,h3,h4,h5])
+    h = jnp.reshape(h,(-1,1))
+
+    return h
+
+
+def get_cov(track):
+    """ return measured errors of track parameters
+    
+    Args:
+        track: dim 'num_track_inputs' sized array
+    Returns:
+        'num_track_params' x 1 array containing track measurement errors
+    """
+    ind = daf.JetData.TRACK_D0_ERR
+    track_err = jnp.array(track[ind:ind+5])
+
+    return abs(track_err)
+
+
+def calculate_chi2(tracks,fitvars,we):
+    """ calculate chi2 of vertex fit for given billoir fit and weights
+
+    Args:
+        tracks: 'num_tracks' x 'num_track_params' input tracks
+        fitvars: '3+3*n_tracks' fit of vertex fit and track mtm fit
+        we: 'n_tracks' array of weights for tracks affecting chi2
+    Returns:
+        chi2 value of fit
+    """
+    n_trks = tracks.shape[0]
+    r = fitvars[0:3]
+    p = fitvars[3:].reshape(n_trks,3)
+
+    t = tracks
+    w = we
+    chi2 = 0
+
+    for i in range(n_trks):
+        qmeas = get_qmeas(t[i])
+        qpred = get_qpred(r, p[i])
+        G = jnp.diag((1./get_cov(t[i])**2))
+        dq = qmeas - qpred
+        chi2 = chi2 + (jnp.transpose(dq) @ G @ dq) * w[i]
+
+    return chi2
+
+
 @jax.jit
-def vertex_fit(tracks,weights,seed):
-    
-    n_trks = 16
-    
-    varlist = [
-        "trk_pt", "trk_d0", "trk_z0", "trk_phi", "trk_theta", 
-        "trk_rho", "trk_ptfrac", "trk_deltar", "trk_pterr", "trk_d0err", 
-        "trk_z0err", "trk_phierr", "trk_thetaerr", "trk_rhoerr", 
-        "trk_signed_sigd0", "trk_signed_sigz0",
-        "prod_x", "prod_y", "prod_z", 
-        "hadron_x", "hadron_y", "hadron_z",
-        "n_trks",   
-    ]
+def billoir_forward(tracks,weights,seed):
+    """ fit a vertex to tracks given weights and initial vertex guess
+
+    Args:
+        tracks: 'n_tracks' x 'n_perigee_params' array of tracks parameterized around origin
+        weights: 'n_tracks' array of track weights for vertex contribution (scales covariance)
+        seed: length 3 array of initial vertex guess for billoir fit in cartesian coords
+    Returns:
+        vertex_fit: length 3 array of vertex x,y,z
+        vtx_fit_covariance: 3x3 array of fit covariacne
+        fit_chi2: chi2 value of the fit (calculated from input covariances)
+        mtm_fit: 'n_tracks' x 3 array of fit for track mtm at vertex fit (used in backwards pass)
+    """
+    n_trks = tracks.shape[0]
 
     def getA_B(theta,phiv,rho,Q,R):
 
@@ -33,7 +134,7 @@ def vertex_fit(tracks,weights,seed):
         A_5 = jnp.stack([useful_zeros, useful_zeros, useful_zeros])
 
         A = jnp.stack([A_1, A_2, A_3, A_4, A_5])
-        
+
         B_1 = jnp.stack([Q, useful_zeros, -(Q**2)/2])
         B_2 = jnp.stack([-R*t, Q*(1+t**2), Q*R*t])
         B_3 = jnp.stack([useful_ones, useful_zeros, -Q])
@@ -43,44 +144,6 @@ def vertex_fit(tracks,weights,seed):
         B = jnp.stack([B_1, B_2, B_3, B_4, B_5])
 
         return A, B
-    
-    def get_qmeas(track):
-
-        d0     = track[varlist.index("trk_d0")]
-        z0     = track[varlist.index("trk_z0")]
-        phi    = track[varlist.index("trk_phi")]
-        theta  = track[varlist.index("trk_theta")]
-        rho    = track[varlist.index("trk_rho")]
-        q = jnp.stack([d0, z0, phi, theta, rho])    
-        q = jnp.reshape(q,(5,1))
-
-        return q
-    
-    def get_qpred(rv, pv):
-        
-        phiv = pv[0]
-        theta = pv[1]
-        rho = pv[2]
-        
-        Q = rv[0]*jnp.cos(phiv) + rv[1]*jnp.sin(phiv)
-        R = rv[1]*jnp.cos(phiv) - rv[0]*jnp.sin(phiv)
-        
-        h1 = -R - Q**2 * (rho)/2
-        h2 = rv[2] - Q*(1-R*(rho))/jnp.tan(theta)
-        h3 = phiv - Q*(rho)
-        h4 = theta
-        h5 = rho
-        h = jnp.stack([h1,h2,h3,h4,h5])
-        h = jnp.reshape(h,(5,1))
-        
-        return h
-    
-    def get_cov(track):
-
-        ind = varlist.index("trk_d0err")
-        track_err = jnp.array(track[ind:ind+5])
-
-        return abs(track_err)
 
     def get_per_track(rv, pv, track):
 
@@ -89,43 +152,48 @@ def vertex_fit(tracks,weights,seed):
         phiv = pv[0]
         theta = pv[1]
         rho = pv[2]
-        
+
         Q = rv[0]*jnp.cos(phiv) + rv[1]*jnp.sin(phiv)
         R = rv[1]*jnp.cos(phiv) - rv[0]*jnp.sin(phiv)
 
         A, B = getA_B(theta,phiv,rho,Q,R)
         A = jnp.squeeze(A)
         B = jnp.squeeze(B)
-        
+
         h = get_qpred(rv, pv)
-        
+
         rv = jnp.reshape(rv,(3,1))
         pv = jnp.reshape(pv,(3,1))
-        
+
         G = jnp.diag(1./get_cov(track)**2)
         Di = jnp.transpose(A) @ G @ B
         D0 = jnp.transpose(A) @ G @ A
-        E = jnp.transpose(B) @ G @ B 
-        W = jnp.linalg.pinv(E)
+        E = jnp.transpose(B) @ G @ B
+        W = jnp.linalg.pinv(E, hermitian=True)
         q_c = qmeas - (h - A @ rv - B @ pv)
-        
+
         return A,B,Di,D0,G,W,q_c
-    
+
     def make_estimate(point, mom, weight):
-        
+        """ do singular billoir fit, linearized around point, mom """
         def per_track_v_estimate(i, params):
             v, cov = params
             A,B,Di,D0,G,W,q_c = get_per_track(point, mom[i], tracks[i])
             v = v + (jnp.transpose(A) @ G @ (jnp.eye(5) - B @ W @ jnp.transpose(B) @ G) @ q_c) * weight[i]
             cov = cov + (D0 - Di @ W @ jnp.transpose(Di)) * weight[i]
             return (v,cov)
-        
-        params = jax.lax.fori_loop(0, n_trks, per_track_v_estimate, (jnp.zeros((3,1), dtype=jnp.float64), jnp.zeros((3,3), dtype=jnp.float64)))
+
+        params = jax.lax.fori_loop(
+            0,
+            n_trks,
+            per_track_v_estimate,
+            (jnp.zeros((3,1), dtype=jnp.float64),jnp.zeros((3,3), dtype=jnp.float64))
+        )
         vn_wo_Cn, Cn_inv = params
-        
-        Cn = jnp.linalg.pinv(Cn_inv)
-        vn = Cn @ vn_wo_Cn   
-        
+
+        Cn = jnp.linalg.pinv(Cn_inv, hermitian=True)
+        vn = Cn @ vn_wo_Cn
+
         mn = jnp.zeros((n_trks,3,1), dtype=jnp.float64)
         def per_track_p_estimate(i, params):
             m = params
@@ -133,95 +201,148 @@ def vertex_fit(tracks,weights,seed):
             mi = W @ jnp.transpose(B) @ G @ (q_c - A @ vn)
             m = m.at[i].set(mi)
             return m
-            
-        mn = jax.lax.fori_loop(0, n_trks, per_track_p_estimate, mn)  
-        
+
+        mn = jax.lax.fori_loop(0, n_trks, per_track_p_estimate, mn)
+
         return jnp.reshape(vn,(3,)), mn, Cn
-    
-    def estimate_vertex(weight):
-    
-        v = seed
+
+    def estimate_vertex(weights):
+        """ Do vertex fit for given track weights (iterative billoir). """
+        vertex = seed
         cov = jnp.zeros((3,3), dtype=jnp.float64)
-        p = jnp.zeros((n_trks,3,1), dtype=jnp.float64)
+        track_mtm = jnp.zeros((n_trks,3,1), dtype=jnp.float64)
+
+        # initialize track momentum guesses to perigee rep around 0's
         for i in range(n_trks):
-            phi0   = jnp.array([tracks[i][varlist.index("trk_phi")]])
-            theta  = jnp.array([tracks[i][varlist.index("trk_theta")]])
-            rho    = jnp.array([tracks[i][varlist.index("trk_rho")]])
+            phi0   = jnp.array([tracks[i][daf.JetData.TRACK_PHI]])
+            theta  = jnp.array([tracks[i][daf.JetData.TRACK_THETA]])
+            rho    = jnp.array([tracks[i][daf.JetData.TRACK_RHO]])
 
             pv = jnp.stack([phi0, theta, rho])
             pv = jnp.reshape(pv,(3,1))
-            p = p.at[i].set(pv)
+            track_mtm = track_mtm.at[i].set(pv)
 
         for i in range(10):
-            v, p, cov = jax.lax.stop_gradient(make_estimate(v, p, weight))
-            
-        vp = jnp.concatenate((v, jnp.ravel(p))).reshape(-1)
-        
-        def chi2(fitvars,we):
-            
-            r = fitvars[0:3]
-            p = fitvars[3:].reshape(n_trks,3)
-        
-            t = tracks
-            w = we
-            x = 0
+            vertex, track_mtm, cov = jax.lax.stop_gradient(
+                make_estimate(vertex, track_mtm, weights)
+            )
 
-            for i in range(n_trks):
+        fit_vars = jnp.concatenate((vertex, jnp.ravel(track_mtm))).reshape(-1)
 
-                qmeas = get_qmeas(t[i])
-                qpred = get_qpred(r, p[i])
-                G = jnp.diag((1./get_cov(t[i])**2))
-                dq = qmeas - qpred
-                x = x + (jnp.transpose(dq) @ G @ dq) * w[i]
+        chi2 = calculate_chi2(tracks,fit_vars,weights)
 
-            return x
-        
-        x2 = chi2(vp,weight)
-        
-        x2_hess = jax.hessian(chi2, argnums=(0,1), has_aux=False)(vp,weight)        
-        grad_v = -jnp.linalg.inv(x2_hess[0][0]) @ x2_hess[0][1]
-        grad_v = jax.numpy.nan_to_num(grad_v, nan=0., posinf=1e200, neginf=-1e200)
-        
-        return v, cov, grad_v, x2
+        return vertex, cov, chi2, track_mtm
+
+    vertex_fit, vtx_fit_covariance, fit_chi2, mtm_fit = estimate_vertex(weights)
+
+    return vertex_fit, vtx_fit_covariance, fit_chi2, mtm_fit
+
+
+@jax.jit
+def billoir_gradient(tracks, weights, vertex_fit, mtm_fit):
+    """ compute gradient at minimization of chi2 of vertex output w.r.t track weights
     
-    v, cov, grad_v, x2 = estimate_vertex(weights)
-    
+    linearization for chi2 is around fit vertex and momentum
+    Args:
+        tracks: 'n_tracks' x 'n_track_params' array of input tracks
+        weights: 'n_tracks' length array of weight for tracks in vertex fit
+        vertex_fit: length 3 array of fit vertex coordinates
+        mtm_fit: 'n_tracks' x 3 x 1 array of fit momentum variables at output vertex
+    Returns: 
+        3 x 'n_tracks' array of vertex coord gradient w.r.t each input track weight
+    """
+    n_trks = tracks.shape[0]
+    vp = jnp.concatenate((vertex_fit, jnp.ravel(mtm_fit))).reshape(-1)
+
+    chi2_hessian = jax.hessian(
+        calculate_chi2,
+        argnums=(1,2),
+        has_aux=False,
+    )(tracks, vp, weights)
+
+    # use implicit function theorem (main optimization as a layer trick)
+    grad_v = -jnp.linalg.inv(chi2_hessian[0][0]) @ chi2_hessian[0][1]
+    grad_v = jnp.nan_to_num(grad_v, nan=0., posinf=1e200, neginf=-1e200)
+
     grad_v = grad_v.reshape(3+3*n_trks,n_trks)
+
+    # only interested in vertex output, not predicted momentum
     grad_v = grad_v[0:3,:]
-    
-    return v, cov, x2, grad_v
+    return grad_v
 
-vertex_fit_vmap = jax.jit(jax.vmap(vertex_fit, in_axes=(0, 0, 0), out_axes=(0, 0, 0, 0)))
 
-def custom(f):
-    
-    n_trks = 16
-    
-    @jax.custom_vjp
-    def custom_f(*args):
-        return f(*args)[0:3]
-    
-    def custom_fwd(*args):
-        return f(*args)[0:3], args
-    
-    def custom_bwd(res, dy):
-        t, w, s = res
-        grad_v = f(t,w,s)[3]
-        
-        grad_output_v = jnp.reshape(dy[0], (-1, 1, 3))
-        grad_v = jnp.reshape(grad_v, (-1, 3, n_trks))
-        
-        batch_grads_v = jnp.einsum('bij,bjk->bik', grad_output_v, grad_v).reshape(-1, n_trks)
-        batch_grads_w = batch_grads_v
-        
-        return None, batch_grads_w, None
-    
-    custom_f.defvjp(custom_fwd, custom_bwd)
-    
-    return custom_f
+billoir_fit_vmap = jax.jit(jax.vmap(billoir_forward, in_axes=(0, 0, 0), out_axes=(0, 0, 0, 0)))
+billoir_grad_vmap = jax.jit(jax.vmap(billoir_gradient, in_axes=(0,0,0,0), out_axes=(0)))
 
-ndive_layer = custom(vertex_fit_vmap)
+
+@jax.custom_vjp
+def vertex_layer(tracks, weights, seed):
+    """ Call billoir vertexing, no gradient requested
+
+    Calls the billoir submodule on tracks, weights, seeds
+
+    Args:
+        tracks: 'n_tracks' x 'n_track_params' sized input array
+        weights: 'n_tracks' of weights of track importance for vertex fit
+        seed: length 3 initial vertex guess
+    Returns:
+        tuple of vertex prediction, covariance of prediction, chi2 of prediction
+    """
+    return billoir_fit_vmap(tracks, weights, seed)[0:3]
+
+
+def vertex_layer_forward(tracks, weights, seed):
+    """ forward method for differentiable billoir
+
+    Args:
+        tracks: track input of dim 'num_jets' x 'num_tracks' x 'num_track_vars'
+        weights: weights for track chi2 contribution of dim 'num_jets' x 'num_tracks'
+        seed: initial guess for vertex of dim 'num_jets' x 3
+    Returns:
+        model outputs, and residuals used to calculate derivative
+    """
+    fit_outs = billoir_fit_vmap(tracks, weights, seed)
+    layer_outs = fit_outs[0:3]
+    # residuals are everything needed to compute derivative in bwd step
+    #    contains tracks, weights, output vertex fit, and output mtm fit
+    layer_residuals = (tracks, weights, fit_outs[0], fit_outs[3])
+    return layer_outs, layer_residuals
+
+
+def vertex_layer_backward(res, dy):
+    """ backward method for computing billoir gradient w.r.t track weights
+
+    Args:
+        res: residuals from fwd method (taken here to be inputs to the model)
+        dy: tangents of the outputs of the function (gradient to back-prop)
+    Returns:
+        derivative of vertex position with respect to track weights
+        also returns emtpy dict and two None to match params, inputs shape as required
+            by nn.custom_jvp
+    """
+    tracks, weights, vertex_fit, mtm_fit = res
+    n_trks = tracks.shape[1]
+    grad_v = billoir_grad_vmap(tracks, weights, vertex_fit, mtm_fit)
+
+    grad_output_v = jnp.reshape(dy[0], (-1, 1, 3))
+    grad_v = jnp.reshape(grad_v, (-1, 3, n_trks))
+
+    batch_grads_v = jnp.einsum("bij,bjk->bik", grad_output_v, grad_v).reshape(-1, n_trks)
+    batch_grads_w = batch_grads_v
+
+    return None, batch_grads_w, None
+
+
+vertex_layer.defvjp(vertex_layer_forward, vertex_layer_backward)
+
 
 @jax.jit
 def ndive(tracks, weights, seed):
-    return ndive_layer(tracks, weights, seed)
+    """ Differentiable billoir vertex fitter for batched jet data.
+
+    Args:
+        tracks: 'num_jets' x 'num_tracks' x 'num_track_params' input track data
+        weights: 'num_jets' x 'num_tracks' weights for track importance in fit
+        seed: 'num_jets' x 3 initial vertex seed in cartesian coordinates
+    """
+    return vertex_layer(tracks, weights, seed)

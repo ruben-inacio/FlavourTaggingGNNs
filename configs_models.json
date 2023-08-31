@@ -4,19 +4,20 @@
         "layers": 3,
         "heads": 2,
         "augment": true,
-        "strategy_prediction": "none",
+        "strategy_prediction": "fit",
         "points_as_features": true,
         "errors_as_features": false,
         "scale": false,
-        "strategy_one_hot": "none"
+        "strategy_one_hot": null
     },
     "predictor": {
-        "hidden_channels": 64,
+        "hidden_channels": 32,
         "layers": 3,
-        "heads": 8,
+        "heads": 2,
         "strategy_weights": "compute",
-        "strategy_sampling": "bernoulli",
-        "use_weights_regression": "true",
-        "method": "regression"
+        "strategy_sampling": "none",
+        "use_weights_regression": false,
+        "use_ghost_track": false,
+        "method": "fit"
     }
 }
