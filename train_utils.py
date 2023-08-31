@@ -30,6 +30,7 @@ N_FEATURES = 18  # DO NOT CHANGE, TO BE REMOVED
 N_JETS = 250 #0 
 N_TRACKS = 15
 
+
 def get_batch(x, y):
     # c_jets = y[:, 0, 19] == 1
     # y = y[c_jets]
@@ -101,7 +102,7 @@ def mask_predictor(params):
     return params
 
 
-def create_train_state(rng, learning_rate, model=None, params=None):
+def create_train_state(rng, learning_rate, model=None, params=None, optimiser='adam'):
     if params is None:  # Initialise the model
         batch, mask = get_init_input()
         
@@ -115,12 +116,13 @@ def create_train_state(rng, learning_rate, model=None, params=None):
             batch['jet_theta']
         )['params']
         if "Predictor" not in str(type(model)):
-            print("Loading NDIVE")
-            params = unfreeze(params)
-            with open(f"../models/ndive/params_0.pickle", 'rb') as fp:
-                ndive_params = pickle.load(fp)
+            pass
+            # print("Loading NDIVE")
+            # params = unfreeze(params)
+            # with open(f"../models/ndive/params_0.pickle", 'rb') as fp:
+            #     ndive_params = pickle.load(fp)
             # params['apply_strategy_prediction_fn'] = ndive_params
-            params = freeze(params)
+            # params = freeze(params)
         else:
             print("Predictor only")
     
@@ -135,10 +137,12 @@ def create_train_state(rng, learning_rate, model=None, params=None):
     #     optax.masked(optax.adam(learning_rate=learning_rate), mask_others)
     # )
         
-    
-    # tx = optax.adamw(learning_rate=learning_rate)
-    # tx = optax.adam(learning_rate=learning_rate)
-    tx = optax.novograd(learning_rate=learning_rate)
+    if optimiser == 'adamw':
+        tx = optax.adamw(learning_rate=learning_rate)
+    elif optimiser == 'adam':
+        tx = optax.adam(learning_rate=learning_rate)
+    elif optimiser == 'novograd':
+        tx = optax.novograd(learning_rate=learning_rate)
     # tx = optax.chain(
     #     optax.adam(learning_rate=learning_rate),
     #     optax.novograd(learning_rate=learning_rate)
@@ -148,9 +152,9 @@ def create_train_state(rng, learning_rate, model=None, params=None):
     return train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx)
 
 
-def init_model(rng, model):
+def init_model(rng, model, optimiser='adam'):
     rng, init_rng = jax.random.split(rng)
-    state = create_train_state(init_rng, LR_INIT, model)
+    state = create_train_state(init_rng, LR_INIT, model, optimiser=optimiser)
     param_count = sum(x.size for x in jax.tree_util.tree_leaves(state.params))
     print("Model and train state created")
     print("Number of parameters:", param_count)

@@ -6,7 +6,7 @@ host = str(subprocess.check_output(['hostname']))
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 if "lipml" in host:
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0" # "1"  # "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1" # "1"  # "0"
 
 import jax
 import functools
@@ -162,7 +162,7 @@ def train_epoch(state, dl, epoch, key, training):
     return state, running_loss, running_loss_aux
 
 
-def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0):
+def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam'):
     early_stop = EarlyStopping(min_delta=1e-6, patience=20)
     epoch = 0
     ckpt = None
@@ -215,7 +215,7 @@ def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0):
             if counter_improvement == 5:
                 learning_rate = learning_rate / 10
                 counter_improvement = 0
-                state = create_train_state(None, learning_rate=learning_rate, model=model,  params=state.params)
+                state = create_train_state(None, learning_rate=learning_rate, model=model,  params=state.params, optimiser=optimiser)
 
         if early_stop.should_stop:
             print('Met early stopping criteria, breaking...')
@@ -245,17 +245,9 @@ def parse_args():
     parser.add_argument('-save_plot_data', default=False, type=bool, help="Save final results for plotting?")
     parser.add_argument('-model', type=str)
     parser.add_argument('-name', default="test", type=str)
+    parser.add_argument('-optimiser', default="adam", type=str)
 
     return parser.parse_args()
-
-
-def init_model(rng, model):
-    rng, init_rng = jax.random.split(rng)
-    state = create_train_state(init_rng, LR_INIT, model)
-    param_count = sum(x.size for x in jax.tree_util.tree_leaves(state.params))
-    print("Model and train state created")
-    print("Number of parameters:", param_count)
-    return rng, state
 
 
 if __name__ == "__main__":
@@ -264,7 +256,7 @@ if __name__ == "__main__":
 
     if opt.dev:
         model = get_model(opt.model)
-        rng, state = init_model(rng)
+        rng, state = init_model(rng, model)
         print(type(model))
         batch = {
             'x': jnp.ones((N_JETS, 15, 18)), 
@@ -307,11 +299,12 @@ if __name__ == "__main__":
         os.makedirs(save_dir)
 
     # save_config_file(save_dir, opt)
+    optimiser = opt.optimiser
 
     model = get_model(opt.model, save_dir=save_dir)
     for instance_id in range(opt.ensemble_size):
         print("Instance number:", instance_id)
-        rng, state = init_model(rng, model)
+        rng, state = init_model(rng, model, optimiser)
         print(type(model))
         ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
