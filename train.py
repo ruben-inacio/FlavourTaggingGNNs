@@ -160,27 +160,34 @@ def train_epoch(state, dl, epoch, key, training):
         return running_loss, running_loss_aux
 
 
-def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam'):
+def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam', lr=LR_INIT):
     early_stop = EarlyStopping(min_delta=1e-6, patience=20)
     epoch = 0
     ckpt = None
     counter_improvement = 0
-    learning_rate = LR_INIT
+    learning_rate = lr
     # TODO need to store losses?
     train_losses = []
     valid_losses = []
     train_losses_aux = []
     valid_losses_aux = []
 
+    train_times = []
+    valid_times = []
+
     # while epoch < 200:
     while True:
         current_secs = datetime.datetime.now().second
         key = jax.random.PRNGKey(current_secs)
-        t0 = time.time()
+        t0_train = time.time()
         state, train_metrics, train_aux_metrics = train_epoch(state, train_dl, epoch, key, training=True)
+        t1_train = time.time()
+        t0_valid = time.time()
         valid_metrics, valid_aux_metrics = train_epoch(state, valid_dl, epoch, key, training=False)
-        t1 = time.time()
-        print("TIME = ", t1 - t0)
+        t1_valid = time.time()
+        train_times.append(t1_train - t0_train)
+        valid_times.append(t1_valid - t0_valid)
+        print("TIME = ", t1_valid - t0_train)
         train_losses.append(float(train_metrics))
         valid_losses.append(float(valid_metrics))
         train_losses_aux.append(jnp.array(train_aux_metrics, dtype=float).tolist())
@@ -229,6 +236,13 @@ def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='a
         }, indent=4)
         histf.write(r)
 
+    with open(save_dir + f"/time_history_{ensemble_id}.json", "w") as histf:
+        r = json.dumps({
+            'train_time': train_times,
+            'valid_time': valid_times
+        }, indent=4)
+        histf.write(r)
+
     return ckpt
 
 
@@ -237,7 +251,7 @@ def parse_args():
     parser.add_argument('-input_dir', default=DEFAULT_DIR, help="Directory where the dataset in stored.")
     parser.add_argument('-input_suffix', default=DEFAULT_SUFFIX, help="Name of the dataset to be loaded.")
     parser.add_argument('-save_dir', default=DEFAULT_MODEL_DIR, help="Directory to store results.")
-    parser.add_argument('-batch_size', default=2500, type=int, help="Batch size")
+    parser.add_argument('-batch_size', default=250, type=int, help="Batch size")
     parser.add_argument('-ensemble_size', default=1, type=int, help="Number of instances to train")
     parser.add_argument('-dev', default=False, type=bool, help="Set to True to check dimensions etc")
     parser.add_argument('-save_plot_data', default=False, type=bool, help="Save final results for plotting?")
@@ -309,9 +323,9 @@ if __name__ == "__main__":
     model = get_model(opt.model, save_dir=save_dir)
     for instance_id in range(opt.ensemble_size):
         print("Instance number:", instance_id)
-        rng, state = init_model(rng, model, optimiser)
+        rng, state = init_model(rng, model, optimiser, lr=opt.lr)
         print(type(model))
-        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id)
+        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=opt.lr)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
         state = ckpt['model']

@@ -6,7 +6,7 @@ host = str(subprocess.check_output(['hostname']))
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 if "lipml" in host:
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1" # "1"  # "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0" # "1"  # "0"
 
 import jax
 import functools
@@ -306,7 +306,7 @@ if __name__ == "__main__":
         print("Instance number:", instance_id)
         rng, state = init_model(rng, model, optimiser)
         print(type(model))
-        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id)
+        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
         state = ckpt['model']

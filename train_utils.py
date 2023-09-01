@@ -147,14 +147,14 @@ def create_train_state(rng, learning_rate, model=None, params=None, optimiser='a
     #     optax.adam(learning_rate=learning_rate),
     #     optax.novograd(learning_rate=learning_rate)
     # )
-    print("CREATING TRAIN STATE WITH LR =", learning_rate)
+    print("CREATING TRAIN STATE WITH", optimiser, "( lr =", learning_rate, ")")
 
     return train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx)
 
 
-def init_model(rng, model, optimiser='adam'):
+def init_model(rng, model, optimiser='adam', lr=LR_INIT):
     rng, init_rng = jax.random.split(rng)
-    state = create_train_state(init_rng, LR_INIT, model, optimiser=optimiser)
+    state = create_train_state(init_rng, lr, model, optimiser=optimiser)
     param_count = sum(x.size for x in jax.tree_util.tree_leaves(state.params))
     print("Model and train state created")
     print("Number of parameters:", param_count)

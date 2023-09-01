@@ -5,7 +5,7 @@
         "heads": 2,
         "augment": false,
         "strategy_prediction": null,
-        "points_as_features": true,
+        "points_as_features": false,
         "errors_as_features": false,
         "scale": false,
         "strategy_one_hot": null
