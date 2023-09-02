@@ -246,7 +246,7 @@ def parse_args():
     parser.add_argument('-model', type=str)
     parser.add_argument('-name', default="test", type=str)
     parser.add_argument('-optimiser', default="adam", type=str)
-    parser.add_argument('-lr', default=1e-3, type=float)
+    parser.add_argument('-lr', default=LR_INIT, type=float)
     return parser.parse_args()
 
 
@@ -304,8 +304,8 @@ if __name__ == "__main__":
     model = get_model(opt.model, save_dir=save_dir)
     for instance_id in range(opt.ensemble_size):
         print("Instance number:", instance_id)
-        rng, state = init_model(rng, model, optimiser)
-        print(type(model))
+        rng, state = init_model(rng, model, optimiser, lr=opt.lr)
+        print(type(model), opt.lr)
         ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=opt.lr)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")

@@ -116,6 +116,175 @@ def update_model(state, grads):
     return state 
 
 
+@jax.jit
+def train_step(state, batch, key):
+    def loss_fn(params):
+        out = model.apply(
+            {'params': params}, 
+            batch['x'], 
+            mask, 
+            batch['jet_vtx'], 
+            batch['trk_vtx'],
+            batch['n_tracks'],
+            batch['jet_phi'],
+            batch['jet_theta'],
+        )
+        return model.loss(out, batch, mask, mask_edges)
+        
+    mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+
+    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+    (loss, loss_tasks), grads = grad_fn(state.params)
+    state = state.apply_gradients(grads=grads)
+
+    return state, loss, loss_tasks
+
+
+@jax.jit
+def eval_step(params, batch, key):
+    batch_idx = jnp.array(list(range(N_JETS))).repeat(15)
+
+    mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+
+    out = model.apply(
+        {'params': params}, 
+        batch['x'], 
+        mask, 
+        batch['jet_vtx'], 
+        batch['trk_vtx'],
+        batch['n_tracks'],
+        batch['jet_phi'],
+        batch['jet_theta'],
+    )
+    return model.loss(out, batch, mask, mask_edges)
+
+
+def warmup_epoch(state, dl, epoch, key, training, batch_size): 
+    running_loss = []
+    running_loss_aux = [[], [], [], []]
+    dl.pin_memory_device = []
+
+    for i, dd in enumerate(dl):
+        for j in range(dd.x.shape[0] // batch_size):
+            x = dd.x[batch_size*j:batch_size*(j+1), :, :]
+            y = dd.y[batch_size*j:batch_size*(j+1), :, :]
+
+            x = jnp.array(x)
+            y = jnp.array(y)
+
+            n_jets, n_tracks, _ = x.shape
+
+            batch = get_batch(x, y)
+
+            if training:
+                state, loss, loss_tasks = train_step(state, batch, key)
+            else:
+                loss, loss_tasks = eval_step(state.params, batch, key)
+            
+            running_loss.append(loss)
+            assert(len(loss_tasks) == 4)
+            for l in range(len(loss_tasks)):
+                running_loss_aux[l].append(loss_tasks[l])
+
+    for l in range(len(running_loss_aux)):
+        running_loss_aux[l] = jnp.mean(jnp.array(running_loss_aux[l])).item()
+    running_loss = jnp.mean(jnp.array(running_loss)).item()
+
+    if training:
+        print('warmup Train - epoch: {}, loss: {}'.format(epoch, running_loss))
+    else:
+        print('warmup Validation - epoch: {}, loss: {}'.format(epoch, running_loss))
+
+    print("(g, n, e, r) =", tuple(running_loss_aux))
+    return state, running_loss, running_loss_aux
+
+
+def warmup_model(batch_size, state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam', lr=LR_INIT):
+    early_stop = EarlyStopping(min_delta=1e-6, patience=20)
+    epoch = 0
+    ckpt = None
+    counter_improvement = 0
+    learning_rate = lr
+    # TODO need to store losses?
+    train_losses = []
+    valid_losses = []
+    train_losses_aux = []
+    valid_losses_aux = []
+
+    train_times = []
+    valid_times = []
+
+    # while epoch < 200:
+    while True:
+        current_secs = datetime.datetime.now().second
+        key = jax.random.PRNGKey(current_secs)
+        t0_train = time.time()
+        state, train_metrics, train_aux_metrics = warmup_epoch(state, train_dl, epoch, key, training=True)
+        t1_train = time.time()
+        t0_valid = time.time()
+        valid_metrics, valid_aux_metrics = warmup_epoch(state, valid_dl, epoch, key, training=False)
+        t1_valid = time.time()
+        train_times.append(t1_train - t0_train)
+        valid_times.append(t1_valid - t0_valid)
+        print("TIME = ", t1_valid - t0_train)
+        train_losses.append(float(train_metrics))
+        valid_losses.append(float(valid_metrics))
+        train_losses_aux.append(jnp.array(train_aux_metrics, dtype=float).tolist())
+        valid_losses_aux.append(jnp.array(valid_aux_metrics, dtype=float).tolist())
+        has_improved, early_stop = early_stop.update(valid_metrics)
+        if has_improved:
+            counter_improvement = 0
+            print("Saving model in epoch %d"%epoch)
+            ckpt = {
+                'epoch': epoch,
+                'loss_train': train_metrics,
+                'loss_valid': valid_metrics,
+                'model': state,
+                # 'optimizer': optimizer.state_dict(),
+                # 'scalers_features': scalers_features
+            }
+            checkpoints.save_checkpoint(
+                ckpt_dir=save_dir,
+                target=ckpt,
+                step=ensemble_id,
+                overwrite=True,
+                keep=100
+            )
+            with open(save_dir + f"/params_{ensemble_id}.pickle", 'wb') as fpk:
+                pickle.dump(state.params, fpk)
+        else:
+            # elif False:
+            counter_improvement += 1
+            if counter_improvement == 5:
+                learning_rate = learning_rate / 10
+                state = create_train_state(None, learning_rate=learning_rate, model=model, params=state.params, optimiser=optimiser)
+                break
+
+        if early_stop.should_stop:
+            print('Met early stopping criteria, breaking...')
+            break
+
+        epoch += 1
+
+    with open(save_dir + f"/warmup_loss_history_{ensemble_id}.json", "w") as histf:
+        r = json.dumps({
+            'train_total': train_losses,
+            'valid_total': valid_losses,
+            'train_aux': train_losses_aux,
+            'valid_aux': valid_losses_aux
+        }, indent=4)
+        histf.write(r)
+
+    with open(save_dir + f"/warmup_time_history_{ensemble_id}.json", "w") as histf:
+        r = json.dumps({
+            'train_time': train_times,
+            'valid_time': valid_times
+        }, indent=4)
+        histf.write(r)
+
+    return state
+
+
 def train_epoch(state, dl, epoch, key, training): 
     state_dist = flax.jax_utils.replicate(state)
 
@@ -326,6 +495,8 @@ if __name__ == "__main__":
         print("Instance number:", instance_id)
         rng, state = init_model(rng, model, optimiser, lr=opt.lr)
         print(type(model))
+        if opt.lr > .0005:
+            state = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=opt.lr)
         ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=opt.lr)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
