@@ -6,7 +6,7 @@ host = str(subprocess.check_output(['hostname']))
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 if "lipml" in host:
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0" # "1"  # "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1" # "1"  # "0"
 
 import jax
 import functools
@@ -162,12 +162,12 @@ def train_epoch(state, dl, epoch, key, training):
     return state, running_loss, running_loss_aux
 
 
-def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam'):
+def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam', lr=LR_INIT):
     early_stop = EarlyStopping(min_delta=1e-6, patience=20)
     epoch = 0
     ckpt = None
     counter_improvement = 0
-    learning_rate = LR_INIT
+    learning_rate = lr
     # TODO need to store losses?
     train_losses = []
     valid_losses = []
@@ -246,7 +246,7 @@ def parse_args():
     parser.add_argument('-model', type=str)
     parser.add_argument('-name', default="test", type=str)
     parser.add_argument('-optimiser', default="adam", type=str)
-
+    parser.add_argument('-lr', default=1e-3, type=float)
     return parser.parse_args()
 
 
@@ -306,7 +306,7 @@ if __name__ == "__main__":
         print("Instance number:", instance_id)
         rng, state = init_model(rng, model, optimiser)
         print(type(model))
-        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser)
+        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=opt.lr)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
         state = ckpt['model']

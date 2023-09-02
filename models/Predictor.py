@@ -133,7 +133,12 @@ class Predictor(nn.Module):
         
         t, g = self.preprocessor(x, mask)
 
-        repr_track = g #jnp.concatenate([t, g], axis=2)
+	        	
+        if isinstance(self.fitting_method, Regression):	
+            repr_track = jnp.concatenate([t, g], axis=2)	
+        else:	
+            repr_track = g #jnp.concatenate([t, g], axis=2)	
+
 
         weights = self.apply_strategy_weights_fn(repr_track, mask, true_jet, true_trk)   
         weights = jnp.where(mask, weights, 1e-100)   

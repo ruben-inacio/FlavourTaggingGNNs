@@ -125,17 +125,6 @@ def create_train_state(rng, learning_rate, model=None, params=None, optimiser='a
             # params = freeze(params)
         else:
             print("Predictor only")
-    
-    # if "apply_strategy_prediction_fn" in params.keys():
-
-    # params = unfreeze(params)
-    # mask_pred = mask_predictor(copy.deepcopy(unfreeze(params)))
-    # mask_others = jax.tree_map(lambda x: not x, mask_pred)
-
-    # tx = optax.chain(
-    #     optax.masked(optax.novograd(learning_rate=learning_rate), mask_pred),
-    #     optax.masked(optax.adam(learning_rate=learning_rate), mask_others)
-    # )
         
     if optimiser == 'adamw':
         tx = optax.adamw(learning_rate=learning_rate)
@@ -143,6 +132,16 @@ def create_train_state(rng, learning_rate, model=None, params=None, optimiser='a
         tx = optax.adam(learning_rate=learning_rate)
     elif optimiser == 'novograd':
         tx = optax.novograd(learning_rate=learning_rate)
+    elif optimiser == 'mixed':
+        params = unfreeze(params)
+        mask_pred = mask_predictor(copy.deepcopy(unfreeze(params)))
+        mask_others = jax.tree_map(lambda x: not x, mask_pred)
+
+        tx = optax.chain(
+            optax.masked(optax.novograd(learning_rate=learning_rate), mask_pred),
+            optax.masked(optax.adamw(learning_rate=learning_rate), mask_others)
+        )
+
     # tx = optax.chain(
     #     optax.adam(learning_rate=learning_rate),
     #     optax.novograd(learning_rate=learning_rate)

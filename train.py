@@ -258,6 +258,7 @@ def parse_args():
     parser.add_argument('-model', type=str)
     parser.add_argument('-name', default="test", type=str)
     parser.add_argument('-optimiser', default="adam", type=str)
+    parser.add_argument('-lr', default=1e-3, type=float)
 
     return parser.parse_args()
 

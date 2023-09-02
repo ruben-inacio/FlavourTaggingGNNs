@@ -3,9 +3,9 @@
         "hidden_channels": 32,
         "layers": 3,
         "heads": 2,
-        "augment": false,
-        "strategy_prediction": null,
-        "points_as_features": false,
+        "augment": true,
+        "strategy_prediction": "fit",
+        "points_as_features": true,
         "errors_as_features": false,
         "scale": false,
         "strategy_one_hot": null
