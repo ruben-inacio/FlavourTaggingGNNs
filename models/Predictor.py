@@ -45,6 +45,8 @@ class Predictor(nn.Module):
 
         if self.method == "regression":
             self.fitting_method = Regression(
+                layers=self.layers,
+                heads=self.heads,
                 hidden_channels=self.hidden_channels,
                 use_weights=self.use_weights_regression)
         else:
@@ -125,7 +127,7 @@ class Predictor(nn.Module):
         
         return x, mask
 
-    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta):
+    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta, **kwargs):
         num_jets, max_num_tracks, _ = x.shape
 
         if self.use_ghost_track:

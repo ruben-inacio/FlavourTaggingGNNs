@@ -57,6 +57,7 @@ def train_step_pmap(key, state, batch_x, batch_y):
                 batch['n_tracks'],
                 batch['jet_phi'],
                 batch['jet_theta'],
+                fix=True
             )
             loss, losses = model.loss(out, batch, mask, mask_edges)
             return loss, losses
@@ -127,7 +128,7 @@ def train_step(state, batch, key):
             batch['trk_vtx'],
             batch['n_tracks'],
             batch['jet_phi'],
-            batch['jet_theta'],
+            batch['jet_theta']
         )
         return model.loss(out, batch, mask, mask_edges)
         
@@ -219,10 +220,10 @@ def warmup_model(batch_size, state, train_dl, valid_dl, save_dir, ensemble_id=0,
         current_secs = datetime.datetime.now().second
         key = jax.random.PRNGKey(current_secs)
         t0_train = time.time()
-        state, train_metrics, train_aux_metrics = warmup_epoch(state, train_dl, epoch, key, training=True)
+        state, train_metrics, train_aux_metrics = warmup_epoch(state, train_dl, epoch, key, training=True, batch_size=batch_size)
         t1_train = time.time()
         t0_valid = time.time()
-        valid_metrics, valid_aux_metrics = warmup_epoch(state, valid_dl, epoch, key, training=False)
+        state, valid_metrics, valid_aux_metrics = warmup_epoch(state, valid_dl, epoch, key, training=False, batch_size=batch_size)
         t1_valid = time.time()
         train_times.append(t1_train - t0_train)
         valid_times.append(t1_valid - t0_valid)
@@ -303,7 +304,11 @@ def train_epoch(state, dl, epoch, key, training):
         if training:
             loss, loss_tasks, grads = train_step_pmap(key, state_dist, x, y)
             state = flax.jax_utils.unreplicate(state_dist)
+            # params_ndive = unfreeze(state.params)['apply_strategy_prediction_fn']
             state = update_model(state, grads)
+            # state.params = unfreeze(state.params)
+            # state.params['apply_strategy_prediction_fn'] = params_ndive
+            # state.params = freeze(state.params)
             state_dist = flax.jax_utils.replicate(state)
         else:
             loss, loss_tasks = eval_step_pmap(key, state_dist, x, y)
@@ -495,7 +500,7 @@ if __name__ == "__main__":
         print("Instance number:", instance_id)
         rng, state = init_model(rng, model, optimiser, lr=opt.lr)
         print(type(model))
-        if opt.lr > .0005:
+        if opt.lr > .0005 and isinstance(model, TN1):
             state = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=opt.lr)
         ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=opt.lr)
         print(f"Best model stats - epoch {ckpt['epoch']}:")

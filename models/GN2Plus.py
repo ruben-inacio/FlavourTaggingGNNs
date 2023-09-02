@@ -56,12 +56,12 @@ class TN1(nn.Module):
         self.extraplator = None
         if self.augment:
             self.extrapolator = extrapolation
-            self.augm_encoder = Encoder(
-                hidden_channels=self.hidden_channels,
-                heads=self.heads,
-                layers=self.layers,
-                architecture="post"
-            )
+            # self.augm_encoder = Encoder(
+            #     hidden_channels=self.hidden_channels,
+            #     heads=self.heads,
+            #     layers=self.layers,
+            #     architecture="post"
+            # )
             self.augm_lin = nn.Dense(features=self.hidden_channels)	
             self.augment_fn = self.add_reference	
         else:	
@@ -212,7 +212,7 @@ class TN1(nn.Module):
 
         return repr_track
 
-    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta):
+    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta, fix=False):
         assert(x.ndim == 3)  # n_jets, n_tracks, n_features
         batch_size, max_tracks, _ = x.shape
 
@@ -240,8 +240,10 @@ class TN1(nn.Module):
 
         t, g = self.preprocessor(x_scaled, mask)
             
-        out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
-        # out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
+        if not fix:
+            out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
+        else:
+            out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
         _, _, _, out_mean, out_var, out_chi = out_preds
         
         repr_track = self.augment_fn(x, out_mean, out_var, t, g, mask, thresholds)

@@ -3,17 +3,24 @@ sys.path.append("../utils/")
 
 from flax import linen as nn  
 import jax.numpy as jnp
-try:    
-    from FlavourTaggingGNNs.utils.layers import GlobalAttention
-except ModuleNotFoundError:
-    from utils.layers import GlobalAttention
+
+from models.PreProcessor import PreProcessor
+from utils.layers import GlobalAttention
 
 
 class Regression(nn.Module):
+    layers: int
+    heads: int
     hidden_channels: int
     use_weights: bool
 
     def setup(self):
+        self.preprocessor = PreProcessor(
+            hidden_channels = self.hidden_channels,
+            layers = self.layers,
+            heads = self.heads,
+            architecture="post"
+        )
         self.gate_nn = nn.Sequential([	
                 nn.Dense(features=self.hidden_channels, param_dtype=jnp.float64),	
                 nn.relu,	
@@ -40,10 +47,14 @@ class Regression(nn.Module):
     def __call__(self, x, repr_track, weights, mask, *args):
         # TODO implement pre processor no?
         if self.use_weights:
-            # pooled, _ = self.pool(weights * repr_track, mask=mask)
-            pooled, _ = self.pool(weights * x, mask=mask)
-        else:
-            pooled, _ = self.pool(repr_track, mask=mask)
+            repr_track = weights * repr_track
+        # _, g = self.preprocessor(x, mask)
+        # if self.use_weights:
+        # pooled, _ = self.pool(weights * repr_track, mask=mask)
+        pooled, _ = self.pool(repr_track, mask=mask)
+        # else:
+        # pooled, _ = self.pool(repr_track, mask=mask)
+        # pooled, _ = self.pool(g, mask=mask)
         out_mean = self.mlp_mean(pooled)
         out_var = self.mlp_var(pooled)
         

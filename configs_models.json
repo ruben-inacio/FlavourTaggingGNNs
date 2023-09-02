@@ -8,16 +8,16 @@
         "points_as_features": true,
         "errors_as_features": false,
         "scale": false,
-        "strategy_one_hot": null
+        "strategy_one_hot": "none"
     },
     "predictor": {
-        "hidden_channels": 32,
+        "hidden_channels": 64,
         "layers": 3,
-        "heads": 2,
+        "heads": 8,
         "strategy_weights": "compute",
         "strategy_sampling": "none",
-        "use_weights_regression": false,
+        "use_weights_regression": true,
         "use_ghost_track": false,
-        "method": "fit"
+        "method": "regression"
     }
 }
