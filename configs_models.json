@@ -8,15 +8,15 @@
         "points_as_features": true,
         "errors_as_features": false,
         "scale": false,
-        "strategy_one_hot": "none"
+        "strategy_encodings": null
     },
     "predictor": {
         "hidden_channels": 32,
         "layers": 3,
         "heads": 2,
         "strategy_weights": "compute",
-        "strategy_sampling": "bernoulli",
-        "activation": "softmax",
+        "strategy_sampling": "none",
+        "activation": "sigmoid",
         "use_ghost_track": false,
         "method": "fit"
     }

@@ -28,9 +28,8 @@ class TN1(nn.Module):
     points_as_features:  bool
     errors_as_features:  bool
     scale:               bool
-    strategy_one_hot:    str
+    strategy_encodings:  str
 
-    
     def debug_print(*args):
         for arg in args:
             print("[DEBUG]", arg)
@@ -62,7 +61,7 @@ class TN1(nn.Module):
             #     layers=self.layers,
             #     architecture="post"
             # )
-            self.augm_lin = nn.Dense(features=self.hidden_channels)	
+            # self.augm_lin = nn.Dense(features=self.hidden_channels)	
             self.augment_fn = self.add_reference	
         else:	
             self.augment_fn = lambda *args: args[4]
@@ -93,8 +92,8 @@ class TN1(nn.Module):
                 heads=                   self.heads,  #2,
                 strategy_sampling=       "none",
                 strategy_weights=        "compute",
-                use_weights_regression = False,
                 use_ghost_track=         False,
+                activation = "softmax",
                 method=                  self.strategy_prediction
             )
         elif self.strategy_prediction is not None:
@@ -102,6 +101,8 @@ class TN1(nn.Module):
         else:
             self.apply_strategy_prediction_fn = lambda *args: (None, None, None, None, None, None)
         
+        if self.strategy_encodings is not None:
+            self.encodings_fn = eval("self.encodings_" + self.strategy_encodings)
         # Output MLPs
 
         self.mlp_graph = nn.Sequential([
@@ -133,13 +134,7 @@ class TN1(nn.Module):
             nn.relu,
             nn.Dense(2, param_dtype=jnp.float64)            
         ])
-        if self.strategy_one_hot == "mlp":
-            self.mlp_thresholds = nn.Sequential([
-                nn.Dense(self.hidden_channels, param_dtype=jnp.float64),
-                nn.relu,
-                nn.Dense(1, param_dtype=jnp.float64),
-                nn.sigmoid
-            ])
+
         self.softmax = lambda x: nn.activation.softmax(x, axis=1)
     
     def apply_prediction_none(self, x, mask, *args):
@@ -156,30 +151,22 @@ class TN1(nn.Module):
             log_errors = jnp.zeros([x.shape[0], 3]) 
             return None, None, None, points, log_errors, None
 
-    def get_thresholds_beta(self, x, mask):
-        key = jax.random.PRNGKey(datetime.datetime.now().second)
-        x = x[:, : ,0]
-        x = jnp.where(mask[:, :, 0], x, -jnp.inf)
-        top_pt = jnp.max(x, axis=1)
-        alpha = top_pt / jnp.mean(x, axis=1, where=mask[:, :, 0])
-        x = jnp.where(mask[:, :, 0], x, jnp.inf)
-        beta =  top_pt / jnp.min(x, axis=1)
-        thresholds = jax.random.beta(key, alpha, beta)
-        thresholds = thresholds.reshape(-1, 1)
-        return thresholds        
+    def encodings_positional(self, x, ids):
+        pass
+        
+    def encodings_one_hot(self, x, ids):
+        ids = jax.nn.one_hot(ids, ids.shape[1])
+        x = jnp.concatenate([x, ids], axis=2)
+        return x
 
-    # def one_hot_encodings(self, x, mask, n_tracks, inv=True, thresholds=0.1):
-    def one_hot_encodings(self, x, mask, n_tracks, thresholds, inv=True):
+    def get_ids(self, x, mask, reverse_mode=True):
         x = x[:, :, 0]
-        x = jnp.where(mask[:, :, 0], x, thresholds * jnp.max(x, axis=1).reshape(-1, 1))
+        x = jnp.where(mask[:, :, 0], x, 0)
         ids = jnp.argsort(x, axis=1)
-        if inv:
+        if reverse_mode:
             ids = ids[:, ::-1]
-
-        ids = jax.nn.one_hot(ids, n_tracks)
         return ids
-        # return jnp.ones([x.shape[0], x.shape[1], x.shape[1]])
-
+    
     def add_reference(self, x, new_ref, new_ref_errors, t, g, mask, thresholds):
         batch_size, n_tracks, _ = x.shape
         x_prime = self.extrapolator(x, jax.lax.stop_gradient(new_ref))
@@ -195,11 +182,10 @@ class TN1(nn.Module):
                 
         x_prime = self.scale_fn(x_prime)
         
-        if self.strategy_one_hot is not None:
-            if self.strategy_one_hot == "mlp":
-                x_prime = jnp.concatenate([x_prime, thresholds.reshape(-1, 1).repeat(n_tracks, axis=1).reshape(-1, n_tracks, 1)], axis=2)
-            ids = self.one_hot_encodings(x_prime, mask, n_tracks, thresholds, inv=False)
-            x_prime = jnp.concatenate([x_prime, ids], axis=2)
+        if self.strategy_encodings is not None:
+            ids = self.get_ids(x_prime, mask, reverse_mode=False)
+            x_prime = self.encodings_fn(x_prime, ids)
+
         t_prime, g_prime = self.preprocessor(x_prime, mask)
 
         # t_mixed = jnp.concatenate([t, t_prime], axis=1)	
@@ -227,16 +213,9 @@ class TN1(nn.Module):
         x_scaled = self.scale_fn(x_)
         
         thresholds=None
-        if self.strategy_one_hot is not None:
-            if self.strategy_one_hot == "mlp":
-                thresholds = self.mlp_thresholds(x_scaled[:, :, 0])  # FIXME x_ or x_scaled?
-                x_scaled = jnp.concatenate([x_scaled, thresholds.reshape(-1, 1).repeat(max_tracks, axis=1).reshape(-1, max_tracks, 1)], axis=2)
-            elif self.strategy_one_hot == "beta":
-                thresholds = jax.lax.stop_gradient(self.get_thresholds_beta(x, mask))
-            elif self.strategy_one_hot == "none":
-                thresholds = jnp.zeros([x_.shape[0], 1])
-            ids = self.one_hot_encodings(x_scaled, mask, max_tracks, thresholds)
-            x_scaled = jnp.concatenate([x_scaled, ids], axis=2)
+        if self.strategy_encodings is not None:
+            ids = self.get_ids(x_scaled, mask, reverse_mode=True)
+            x_scaled = self.encodings_fn(x_scaled, ids)
 
         t, g = self.preprocessor(x_scaled, mask)
             
@@ -281,7 +260,7 @@ class TN1(nn.Module):
         assert(out_edges.shape == (batch_size, max_tracks**2, 2))
         out_edges = nn.softmax(out_edges, axis=2)
         # FIXME may work only on analysis
-        return out_graph, out_nodes, out_edges, out_mean, out_var, out_chi #, t
+        return out_graph, out_nodes, out_edges, out_mean, out_var, out_chi, t
 
     def loss(self, out, batch, mask_nodes, mask_edges):
         out_graph, out_nodes, out_edges, out_mean, out_var, out_chi = out

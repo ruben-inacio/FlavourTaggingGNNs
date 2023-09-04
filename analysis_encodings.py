@@ -13,6 +13,7 @@ import json
 import pickle
 from models.GN2Plus import TN1
 import jax.numpy as jnp
+import numpy as np
 import jax
 import datetime
 import matplotlib.pyplot as plt
@@ -20,6 +21,12 @@ from flax.core import freeze, unfreeze
 import torch
 from train_utils import get_batch
 from utils.layers import mask_tracks
+import random
+# Configuring seeds
+seed = 1906
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
 
 base_path = "../models_v2/gn2ndive_atlas"
 model_path = "../models_v2/gn2ndive_atlas_onehot_none"
@@ -40,7 +47,7 @@ with open(model_path + "/params_0.pickle", 'rb') as f:
 base = TN1(**base_settings)
 model = TN1(**model_settings)
 
-if False:
+if True:
     for name in base_params['preprocessor']['track_init']:
         fig, ax = plt.subplots(1, 2,figsize=(16,8))
 
@@ -58,7 +65,7 @@ if False:
         plt.tight_layout()
         fig.colorbar(d1)
         fig.colorbar(d2)
-        plt.savefig(f"analysis/weights_{name}.png")
+        plt.savefig(f"../analysis/mlps/weights_{name}.png")
 
 # for k in range(10):
 #     os.makedirs("analysis/jet{:02d}".format(k))
@@ -67,12 +74,16 @@ if False:
 
 N_JETS = 250
 test_dl = torch.load("/lstore/titan/miochoa/TrackGeometry2023/RachelDatasets_Jun2023/all_flavors/all_flavors/test_dl.pth")
+print("dataset loaded")
+
+summary = [["Quality level", "Distance", "Prediction", "True"]]
+
 for i, dd in enumerate(test_dl):
-    if i == 1:
-        break
+    # if i == 1:
+    #     break
     for j in range(dd.x.shape[0] // N_JETS):
-        if j == 1:
-            break
+        # if j == 1:
+        #     break
 
         x = dd.x[N_JETS*j:N_JETS*(j+1), :, :]
         y = dd.y[N_JETS*j:N_JETS*(j+1), :, :]
@@ -107,14 +118,67 @@ for i, dd in enumerate(test_dl):
             batch['jet_phi'],
             batch['jet_theta'],
         )
-        probs_base, reprs_base = out[0], out[-1]
+        probs_base, pred_vtx, reprs_base = out[0], out[3], out[-1]
+        for k in range(N_JETS):
 
-        for k in range(10):
             true = jnp.argmax(batch['jet_y'][k, :])
             model_pred = probs_model[k, :]
             base_pred = probs_base[k, :]
-            with open("analysis/jet{:02d}/predictions.txt".format(k), "w") as fres:
+
+            # Quality level assignment
+            performance_diff = model_pred[true] - base_pred[true]
+            if performance_diff < -.4:
+                lvl = 1
+            elif performance_diff < -.2:
+                lvl = 2
+            elif performance_diff < .1:
+                lvl = 3
+            elif performance_diff < .2:
+                lvl = 4
+            else:
+                lvl = 5
+            
+
+            # Distance category assignment for summary 
+            distance = jnp.sqrt(jnp.sum(jnp.square(pred_vtx[k, :] - batch['jet_vtx'][k, :])))
+            if distance < jnp.sqrt(.01*3):
+                category = "Very close"
+            if distance < jnp.sqrt(.25*3):
+                category = "Close"
+            elif distance < 2:
+                category = "Below 2"
+            else:
+                category = "Far"
+
+            pred_dist = jnp.sqrt(jnp.sum(jnp.square(pred_vtx[k, :] - jnp.array([0,0,0]))))
+            true_dist = jnp.sqrt(jnp.sum(jnp.square(batch['jet_vtx'][k, :] - jnp.array([0,0,0]))))
+            if pred_dist < jnp.sqrt(.01*3):
+                category_pred = "Very close to 000"
+            if pred_dist < jnp.sqrt(.25*3):
+                category_pred = "Close to 000"
+            elif pred_dist < 2:
+                category_pred = "Not that close"
+            else:
+                category_pred = "Far"
+
+            if true_dist < jnp.sqrt(.01*3):
+                category_true = "Very close to 000"
+            if true_dist < jnp.sqrt(.25*3):
+                category_true = "Close to 000"
+            elif true_dist < 2:
+                category_true = "Not that close"
+            else:
+                category_true = "Far"
+
+            summary.append([lvl, category, category_pred, category_true])
+            print(summary[-1])
+            continue  #FIXME remove to store jet data
+            if not os.path.exists("../analysis/lvl{}/jet{:02d}".format(lvl, k)):
+                os.makedirs("../analysis/lvl{}/jet{:02d}".format(lvl, k))
+            with open("../analysis/lvl{}/jet{:02d}/predictions.txt".format(lvl, k), "w") as fres:
                 fres.write("true = " + str(true) + '\n')
+                fres.write("true vtx = " + str(batch['jet_vtx'][k, :]) + '\n')
+                fres.write("pred vtx = " + str(pred_vtx[k, :]) + '\n')
                 fres.write("base =" + str(base_pred) +'\n')
                 fres.write("model =" + str(model_pred) + '\n')
             
@@ -124,9 +188,18 @@ for i, dd in enumerate(test_dl):
             cmap = "winter"
             d1 = ax[0].imshow(reprs_base[k, :], cmap=cmap, vmin=vmin, vmax=vmax)
             d2 = ax[1].imshow(reprs_model[k, :], cmap=cmap, vmin=vmin, vmax=vmax)
+            # d3 = ax[1, 0].imshow(reprs_model[k, :32], cmap=cmap, vmin=vmin, vmax=vmax)
+            # d4 = ax[1, 1].imshow(reprs_model[k, 32:], cmap=cmap, vmin=vmin, vmax=vmax)
             plt.tight_layout()
             fig.colorbar(d1)
             fig.colorbar(d2)
-            plt.savefig("analysis/jet{:02d}/representations.pdf".format(k))
+            plt.savefig("../analysis/lvl{}/jet{:02d}/representations.pdf".format(lvl, k))
             plt.close()
+        
+summary = [summary[0]] + sorted(summary[1:], key = lambda x: x[0])
+lvl45 = list(filter(lambda x: x[0] > 3, summary[1:]))
+lvl123 = list(filter(lambda x: x[0] < 4, summary[1:]))
+with open("../analysis/summary_all.txt", "w") as fsummary:
+    for line in range(len(summary)):
+        fsummary.write("{},{:20s},{:20s},{:20s},\n".format(*summary[line]))
         
