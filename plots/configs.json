@@ -1,10 +1,10 @@
 {
-    "results_dir": "../../plots2808",
+    "results_dir": "../../plots/regression_ste",
     "models": [
-        "../../models/gn2",  "../../models/gn2_ndive",  "../../models/gn2_ndive_onehot_threshold_000_inv"
+        "../../models/regression_ste"
     ],
     "labels_models": [
-        "GN2", "GN2+ A", "GN2+ B"
+        "reg_ste"
     ],
     "labels_graph": [
         "b", "c", "u"
@@ -25,7 +25,7 @@
         "dodgerblue", 
         "skyblue"
     ],
-    "ground_truth": "../../ground_truth_1407",
+    "ground_truth": "../../ground_truth",
     "ground_truth_rachel": "../../DifferentiableVertexingProject",
     "ground_truth_original": "../../ground_truth_1407",
     "ndive_path": [

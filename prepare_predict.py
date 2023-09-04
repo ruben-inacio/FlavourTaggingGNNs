@@ -38,9 +38,6 @@ def parse_args():
     parser.add_argument('-model', type=str)
     return parser.parse_args()
 
-path = 'dd'
-model = None
-params = None
 
 N_JETS = 250
 
@@ -168,12 +165,12 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
     print("valid_nodes =", (true_nodes > -1).sum())
     print("valid_edges =", (true_edges > -1).sum())
     if save_truth:
-        np.save('../ground_truth_2608/jet_vtx.npy', true)
-        np.save('../ground_truth_2608/trk_y.npy', true_nodes)
-        np.save('../ground_truth_2608/edge_y.npy', true_edges)
-        np.save('../ground_truth_2608/jet_y.npy', true_flavours)
-        np.save('../ground_truth_2608/jet_pts.npy', jet_pts)
-        np.save('../ground_truth_2608/jet_trks.npy', jet_trks)
+        np.save('../ground_truth/jet_vtx.npy', true)
+        np.save('../ground_truth/trk_y.npy', true_nodes)
+        np.save('../ground_truth/edge_y.npy', true_edges)
+        np.save('../ground_truth/jet_y.npy', true_flavours)
+        np.save('../ground_truth/jet_pts.npy', jet_pts)
+        np.save('../ground_truth/jet_trks.npy', jet_trks)
 
 
     return pred_mu, pred_sigma, true, true_flavours, jet_pts, jet_trks   
@@ -204,6 +201,7 @@ if __name__ == '__main__':
         with open(f"{save_dir}/params_{ensemble_id}.pickle", 'rb') as fp:
             params = pickle.load(fp)
 
+        # store_predictions(model, params, test_dl, save_dir, save_truth=ensemble_id == 0, ensemble_id=ensemble_id)
         store_predictions(model, params, test_dl, save_dir, save_truth=False, ensemble_id=ensemble_id)
         # Restoring seeds
         torch.manual_seed(seed)

@@ -318,6 +318,7 @@ def plot_fitting_average(predictions, errors, true_vtx, true_graph, jet_var, lab
 
     flavour_set = np.unique(true_graph).tolist()
 
+    """
     for m in range(len(predictions)):
         pred_bins = assign_bins(predictions[m], jet_var, bins, mean=False)
         errors_bins = assign_bins(errors[m], jet_var, bins, mean=False)
@@ -339,7 +340,7 @@ def plot_fitting_average(predictions, errors, true_vtx, true_graph, jet_var, lab
                     results_dir,
                     f"fitting_flavour_bin_{i}_flavour_{flavour}_{labels[m]}"
                 )    
-
+    """
     for m in range(len(predictions)):
         plots_3d_fitting(true_vtx, predictions[m], errors[m], "Test dataset", results_dir, f"fitting_{labels[m]}")
         for flavour in flavour_set:
@@ -399,7 +400,8 @@ def plot_discriminated_by_flavour(predictions, errors, true_vtx, true_graph, jet
             bins, 
             xlabel=jet_var_label,
             ylabel="Mean Euclidean Distance [mm]",
-            ylims=(0.0, 8.0)
+            ylims=(0.0, 8.0),
+            show_errors=True
         )
 
         plot_fn(

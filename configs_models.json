@@ -11,13 +11,13 @@
         "strategy_one_hot": "none"
     },
     "predictor": {
-        "hidden_channels": 64,
+        "hidden_channels": 32,
         "layers": 3,
-        "heads": 8,
+        "heads": 2,
         "strategy_weights": "compute",
-        "strategy_sampling": "none",
-        "use_weights_regression": true,
+        "strategy_sampling": "bernoulli",
+        "activation": "softmax",
         "use_ghost_track": false,
-        "method": "regression"
+        "method": "fit"
     }
 }

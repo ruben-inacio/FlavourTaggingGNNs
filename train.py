@@ -39,6 +39,7 @@ import json
 import pickle
 from train_utils import *
 import time
+import datetime
 
 
 @partial(jax.pmap, axis_name="device", in_axes=(None, 0, 0, 0),  out_axes=(0, 0, 0))
@@ -438,7 +439,7 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    rng = jax.random.PRNGKey(42)
+    rng = jax.random.PRNGKey(datetime.datetime.now().second)
     opt = parse_args()
 
 
@@ -494,9 +495,11 @@ if __name__ == "__main__":
 
     # save_config_file(save_dir, opt)
     optimiser = opt.optimiser
-
+    num_instances = sum(['loss_history' in fn for fn in os.listdir(save_dir)])
+    print("Number of instances already trained:", num_instances)
+                         
     model = get_model(opt.model, save_dir=save_dir)
-    for instance_id in range(opt.ensemble_size):
+    for instance_id in range(num_instances, opt.ensemble_size):
         print("Instance number:", instance_id)
         rng, state = init_model(rng, model, optimiser, lr=opt.lr)
         print(type(model))

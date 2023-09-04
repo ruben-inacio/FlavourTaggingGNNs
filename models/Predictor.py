@@ -19,8 +19,8 @@ class Predictor(nn.Module):
     heads: int
     strategy_weights: str
     strategy_sampling: str
-    use_weights_regression: bool
     use_ghost_track: bool
+    activation: str
     method: str
 
     def setup(self):
@@ -37,6 +37,11 @@ class Predictor(nn.Module):
                 nn.relu,
                 nn.Dense(features=1, param_dtype=jnp.float64)
             ])
+        
+        if self.activation == "sigmoid":
+            self.activation_fn = nn.sigmoid
+        elif self.activation == "softmax":
+            self.activation_fn = lambda x: nn.activation.softmax(x, axis=1)
 
         self.apply_strategy_weights_fn = eval("self.apply_strategy_weights_" + self.strategy_weights)
         self.sample_fn = eval("self.sample_" + self.strategy_sampling)
@@ -44,11 +49,7 @@ class Predictor(nn.Module):
             self.sample_fn = lambda *args: jax.lax.stop_gradient(self.sample_fn(*args))
 
         if self.method == "regression":
-            self.fitting_method = Regression(
-                layers=self.layers,
-                heads=self.heads,
-                hidden_channels=self.hidden_channels,
-                use_weights=self.use_weights_regression)
+            self.fitting_method = Regression(hidden_channels=self.hidden_channels)
         else:
             self.fitting_method = lambda x, _, wv, mask: ndive(x, jnp.where(mask.squeeze(), wv.squeeze(), 1e-100), jnp.zeros([x.shape[0], 3]))
 
@@ -81,10 +82,8 @@ class Predictor(nn.Module):
 
         weights = self.nn_sample(repr_track)
         weights = jnp.where(mask, weights, jnp.array([-jnp.inf]))
-        weights = nn.activation.softmax(weights, axis=1)
-        # FIXME
-        # weights = jax.lax.stop_gradient(self.sample_fn(weights))
-
+        weights = self.activation_fn(weights)
+        
         return weights
 
     def add_ghost_track(self, x, mask, n_tracks, jet_phi, jet_theta):

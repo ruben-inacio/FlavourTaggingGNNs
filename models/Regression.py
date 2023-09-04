@@ -9,18 +9,9 @@ from utils.layers import GlobalAttention
 
 
 class Regression(nn.Module):
-    layers: int
-    heads: int
     hidden_channels: int
-    use_weights: bool
 
     def setup(self):
-        self.preprocessor = PreProcessor(
-            hidden_channels = self.hidden_channels,
-            layers = self.layers,
-            heads = self.heads,
-            architecture="post"
-        )
         self.gate_nn = nn.Sequential([	
                 nn.Dense(features=self.hidden_channels, param_dtype=jnp.float64),	
                 nn.relu,	
@@ -46,9 +37,8 @@ class Regression(nn.Module):
 
     def __call__(self, x, repr_track, weights, mask, *args):
         # TODO implement pre processor no?
-        if self.use_weights:
-            repr_track = weights * repr_track
-        # _, g = self.preprocessor(x, mask)
+        repr_track = weights * repr_track
+
         # if self.use_weights:
         # pooled, _ = self.pool(weights * repr_track, mask=mask)
         pooled, _ = self.pool(repr_track, mask=mask)
