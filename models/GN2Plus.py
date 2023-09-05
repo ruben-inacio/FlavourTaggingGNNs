@@ -4,6 +4,7 @@ from flax import linen as nn
 import jax.numpy as jnp
 import jax
 import datetime
+import time 
 
 try:
     from FlavourTaggingGNNs.utils.layers import GlobalAttention, EncoderLayer, Encoder
@@ -152,20 +153,25 @@ class TN1(nn.Module):
             return None, None, None, points, log_errors, None
 
     def encodings_positional(self, x, ids):
-    def get_pe_batch(x, ids):
-        _, max_len, d_model = x.shape
-        pe = np.zeros(x.shape)
-        position = ids[:, :, None]
-        div_term = np.exp(np.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))[:max_len]
-        div_term = np.repeat(div_term[:, None], 10, axis=1).T[:, :, None]
+        num_jets, max_len, d_model = x.shape
+        pe = jnp.zeros(x.shape)
+        position = ids[:, :, None] # * 3
+        div_term = jnp.exp(jnp.arange(0, d_model, 2) * (-jnp.log(10000.0) / d_model))[:max_len]
+        div_term = jnp.repeat(div_term[:, None], num_jets, axis=1).T[:, :, None]
         # print(ids.shape, position.shape, div_term.shape)
-        pe[:, :, 0::2] = np.sin(position * div_term)
-        pe[:, :, 1::2] = np.cos(position * div_term)
+        pe.at[:, :, 0::2].set(jnp.sin(position * div_term))
+        pe.at[:, :, 1::2].set(jnp.cos(position * div_term))
         x = x + pe
+        # x = jnp.concatenate([x, pe], axis=2)
         return x
         
     def encodings_one_hot(self, x, ids):
         ids = jax.nn.one_hot(ids, ids.shape[1])
+        
+        # rng = jax.random.PRNGKey(time.time_ns() % 100)
+        # rng, init_rng = jax.random.split(rng)
+        # ids = jax.random.uniform(init_rng, shape=[x.shape[0], x.shape[1], x.shape[1]], minval=-20, maxval=20)
+        
         x = jnp.concatenate([x, ids], axis=2)
         return x
 
@@ -201,6 +207,7 @@ class TN1(nn.Module):
         t_prime, g_prime = self.preprocessor(x_prime, mask)
         
         if self.strategy_encodings == "positional":
+            # g_prime = self.encodings_fn(g_prime, x_prime[:, :, 0])
             g_prime = self.encodings_fn(g_prime, ids)
 
         # t_mixed = jnp.concatenate([t, t_prime], axis=1)	
@@ -237,6 +244,7 @@ class TN1(nn.Module):
         t, g = self.preprocessor(x_scaled, mask)
 
         if self.strategy_encodings == "positional":
+            # g = self.encodings_fn(g, x[:, :, 0])
             g = self.encodings_fn(g, ids)
             
         if not fix:
