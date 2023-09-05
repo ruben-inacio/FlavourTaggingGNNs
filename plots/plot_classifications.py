@@ -462,7 +462,7 @@ def compare_models_discriminator_ATLAS(jet_results, jet_true, save_dir, labels):
         plt.savefig(f"{save_dir}/discriminator_{labels[0]}_vs_{labels[t]}.pdf")
 
     reset_font()
-    exit(0)
+
 
 # High-level functions
 def plot_classifications(predictions, targets, labels, labels_key):

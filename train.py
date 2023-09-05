@@ -495,17 +495,20 @@ if __name__ == "__main__":
 
     # save_config_file(save_dir, opt)
     optimiser = opt.optimiser
-    num_instances = sum(['loss_history' in fn for fn in os.listdir(save_dir)])
+    num_instances = sum([fn.startswith('loss_history') for fn in os.listdir(save_dir)])
     print("Number of instances already trained:", num_instances)
-                         
+
     model = get_model(opt.model, save_dir=save_dir)
+
     for instance_id in range(num_instances, opt.ensemble_size):
+        lr = opt.lr
         print("Instance number:", instance_id)
         rng, state = init_model(rng, model, optimiser, lr=opt.lr)
         print(type(model))
-        if opt.lr > .0005 and isinstance(model, TN1):
-            state = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=opt.lr)
-        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=opt.lr)
+        if lr > .0005 and isinstance(model, TN1):
+            state = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr)
+            lr = lr / 10
+        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
         state = ckpt['model']

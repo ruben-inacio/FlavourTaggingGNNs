@@ -1,10 +1,10 @@
 {
-    "results_dir": "../../plots/regression_ste",
+    "results_dir": "../../plots/optimisers",
     "models": [
-        "../../models/regression_ste"
+        "../../models/gn2_adamw_0001", "../../models/gn2_novograd_0001", "../../models/gn2ndive_novograd_0001"
     ],
     "labels_models": [
-        "reg_ste"
+        "gn2 adamw", "gn2 novograd", "gn2ndive novograd"
     ],
     "labels_graph": [
         "b", "c", "u"

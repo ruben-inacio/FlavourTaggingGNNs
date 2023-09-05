@@ -152,7 +152,17 @@ class TN1(nn.Module):
             return None, None, None, points, log_errors, None
 
     def encodings_positional(self, x, ids):
-        pass
+    def get_pe_batch(x, ids):
+        _, max_len, d_model = x.shape
+        pe = np.zeros(x.shape)
+        position = ids[:, :, None]
+        div_term = np.exp(np.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))[:max_len]
+        div_term = np.repeat(div_term[:, None], 10, axis=1).T[:, :, None]
+        # print(ids.shape, position.shape, div_term.shape)
+        pe[:, :, 0::2] = np.sin(position * div_term)
+        pe[:, :, 1::2] = np.cos(position * div_term)
+        x = x + pe
+        return x
         
     def encodings_one_hot(self, x, ids):
         ids = jax.nn.one_hot(ids, ids.shape[1])
@@ -184,9 +194,14 @@ class TN1(nn.Module):
         
         if self.strategy_encodings is not None:
             ids = self.get_ids(x_prime, mask, reverse_mode=False)
+        
+        if self.strategy_encodings == "one_hot":
             x_prime = self.encodings_fn(x_prime, ids)
 
         t_prime, g_prime = self.preprocessor(x_prime, mask)
+        
+        if self.strategy_encodings == "positional":
+            g_prime = self.encodings_fn(g_prime, ids)
 
         # t_mixed = jnp.concatenate([t, t_prime], axis=1)	
         # mask_mixed = jnp.concatenate([mask, mask], axis=1)	
@@ -215,9 +230,14 @@ class TN1(nn.Module):
         thresholds=None
         if self.strategy_encodings is not None:
             ids = self.get_ids(x_scaled, mask, reverse_mode=True)
+        
+        if self.strategy_encodings == "one_hot":
             x_scaled = self.encodings_fn(x_scaled, ids)
 
         t, g = self.preprocessor(x_scaled, mask)
+
+        if self.strategy_encodings == "positional":
+            g = self.encodings_fn(g, ids)
             
         if not fix:
             out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
@@ -260,7 +280,7 @@ class TN1(nn.Module):
         assert(out_edges.shape == (batch_size, max_tracks**2, 2))
         out_edges = nn.softmax(out_edges, axis=2)
         # FIXME may work only on analysis
-        return out_graph, out_nodes, out_edges, out_mean, out_var, out_chi, t
+        return out_graph, out_nodes, out_edges, out_mean, out_var, out_chi, #t
 
     def loss(self, out, batch, mask_nodes, mask_edges):
         out_graph, out_nodes, out_edges, out_mean, out_var, out_chi = out
