@@ -27,14 +27,23 @@ DEFAULT_MODEL_DIR = "../models" #"../models"
 # GLOBAL SETTINGS
 LR_INIT = 1e-3 #1e-3
 N_FEATURES = 18  # DO NOT CHANGE, TO BE REMOVED
-N_JETS = 250 #0 
+N_JETS = 250 
 N_TRACKS = 15
+
+def filter_jets(x, y):
+    trk_vtx = x[:, :, 16:19]
+    jet_vtx = x[:, :, 19:22]
+    aligned = jnp.sum(trk_vtx == jet_vtx, axis=2) == 3
+    mask = jnp.any(aligned, axis=1) # jnp.repeat(jnp.any(aligned, axis=1)[:, None], x.shape[1], axis=1)#[:, :, None]
+
+    x = x[mask]
+    y = y[mask]
+
+    return x, y
 
 
 def get_batch(x, y):
-    # c_jets = y[:, 0, 19] == 1
-    # y = y[c_jets]
-    # x = x[c_jets]
+    # x, y = filter_jets(x, y)
 
     batch = {}
     batch['x'] = jnp.concatenate((x[:, :, :16], jnp.log(x[:, :, 26:27]), x[:,:, 27:28]),axis=2)

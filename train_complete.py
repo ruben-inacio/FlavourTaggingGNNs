@@ -69,6 +69,9 @@ def train_step(state, batch, key):
 
     grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
     (loss, loss_tasks), grads = grad_fn(state.params)
+    # print(grads['preprocessor']['track_init']['layers_2']['kernel'])
+    # print(grads)
+    # exit(0)
     state = state.apply_gradients(grads=grads)
 
     return state, loss, loss_tasks
@@ -134,7 +137,7 @@ def train_epoch(state, dl, epoch, key, training):
 
             x = jnp.array(x)
             y = jnp.array(y)
-
+            # x, y = filter_jets(x, y)
             n_jets, n_tracks, _ = x.shape
 
             batch = get_batch(x, y)

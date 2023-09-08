@@ -307,7 +307,7 @@ class TN1(nn.Module):
         loss_edges = jnp.mean(loss_edges, where=mask_edges)
 
         if out_mean is not None: 
-            loss_predictor = jnp.sqrt(jnp.sum((batch['jet_vtx']-out_mean)**2, axis=1)).reshape(-1,1)
+            loss_predictor = squared_error(batch['jet_vtx'], out_mean)
             loss_predictor = jnp.mean(loss_predictor)
         else:
             loss_predictor = 0

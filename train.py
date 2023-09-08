@@ -297,7 +297,7 @@ def train_epoch(state, dl, epoch, key, training):
 
         x = jnp.array(d.x, dtype=jnp.float64)
         y = jnp.array(d.y, dtype=jnp.float64)
-
+        # x, y =filter_jets(x, y)
 
         x = jax.tree_map(lambda m: m.reshape((DEVICE_COUNT, TRAIN_VMAP_COUNT, -1, *m.shape[1:])), x)
         y = jax.tree_map(lambda m: m.reshape((DEVICE_COUNT, TRAIN_VMAP_COUNT, -1, *m.shape[1:])), y)
@@ -335,7 +335,7 @@ def train_epoch(state, dl, epoch, key, training):
         return running_loss, running_loss_aux
 
 
-def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam', lr=LR_INIT, batch_size=250):
+def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam', lr=LR_INIT):
     early_stop = EarlyStopping(min_delta=1e-6, patience=20)
     epoch = 0
     ckpt = None
@@ -350,21 +350,21 @@ def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='a
     train_times = []
     valid_times = []
     
-    current_secs = datetime.datetime.now().second
-    key = jax.random.PRNGKey(current_secs)
-    t0_train = time.time()
-    state, train_metrics, train_aux_metrics = train_epoch(state, train_dl, epoch, key, training=True, batch_size)
-    t1_train = time.time()
-    t0_valid = time.time()
-    valid_metrics, valid_aux_metrics = train_epoch(state, valid_dl, epoch, key, training=False, batch_size)
-    t1_valid = time.time()
-    train_times.append(t1_train - t0_train)
-    valid_times.append(t1_valid - t0_valid)
-    print("TIME = ", t1_valid - t0_train)
-    train_losses.append(float(train_metrics))
-    valid_losses.append(float(valid_metrics))
-    train_losses_aux.append(jnp.array(train_aux_metrics, dtype=float).tolist())
-    valid_losses_aux.append(jnp.array(valid_aux_metrics, dtype=float).tolist())
+    # current_secs = datetime.datetime.now().second
+    # key = jax.random.PRNGKey(current_secs)
+    # t0_train = time.time()
+    # state, train_metrics, train_aux_metrics = train_epoch(state, train_dl, epoch, key, training=True, batch_size)
+    # t1_train = time.time()
+    # t0_valid = time.time()
+    # valid_metrics, valid_aux_metrics = train_epoch(state, valid_dl, epoch, key, training=False, batch_size)
+    # t1_valid = time.time()
+    # train_times.append(t1_train - t0_train)
+    # valid_times.append(t1_valid - t0_valid)
+    # print("TIME = ", t1_valid - t0_train)
+    # train_losses.append(float(train_metrics))
+    # valid_losses.append(float(valid_metrics))
+    # train_losses_aux.append(jnp.array(train_aux_metrics, dtype=float).tolist())
+    # valid_losses_aux.append(jnp.array(valid_aux_metrics, dtype=float).tolist())
 
     # while epoch < 200:
     while True:
@@ -521,7 +521,7 @@ if __name__ == "__main__":
         print("Instance number:", instance_id)
         rng, state = init_model(rng, model, optimiser, lr=opt.lr)
         print(type(model))
-        if False and lr > .0005 and isinstance(model, TN1):
+        if lr > .0005 and isinstance(model, TN1):
             state = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr)
             lr = lr / 10
         ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr)
