@@ -6,18 +6,11 @@ import jax
 import datetime
 import time 
 
-try:
-    from FlavourTaggingGNNs.utils.layers import GlobalAttention, EncoderLayer, Encoder
-    from FlavourTaggingGNNs.utils.losses import *
-    from FlavourTaggingGNNs.models.PreProcessor import PreProcessor
-    from FlavourTaggingGNNs.models.Predictor import Predictor
-    from FlavourTaggingGNNs.utils.extrapolation import extrapolation
-except ModuleNotFoundError:
-    from utils.layers import GlobalAttention, EncoderLayer, Encoder
-    from utils.losses import *
-    from models.PreProcessor import PreProcessor
-    from models.Predictor import Predictor
-    from utils.extrapolation import extrapolation
+from utils.layers import GlobalAttention, EncoderLayer, Encoder
+from utils.losses import *
+from models.PreProcessor import PreProcessor
+from models.Predictor import Predictor
+from utils.extrapolation import extrapolation
 
 
 class TN1(nn.Module):
@@ -192,6 +185,8 @@ class TN1(nn.Module):
                 new_ref_errors = jax.lax.map(jnp.diag, new_ref_errors)
             x_points = jnp.repeat(new_ref, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
             x_errors = jnp.repeat(new_ref_errors, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
+            x_points = jax.lax.stop_gradient(x_points)
+            x_errors = jax.lax.stop_gradient(x_errors)
             x_prime = jnp.concatenate([x_prime, x_points], axis=2)
             if self.errors_as_features:
                 x_prime = jnp.concatenate([x_prime, x_errors], axis=2)
