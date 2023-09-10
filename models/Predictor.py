@@ -22,13 +22,15 @@ class Predictor(nn.Module):
     use_ghost_track: bool
     activation: str
     method: str
+    use_encodings: bool
 
     def setup(self):
         self.preprocessor = PreProcessor(
             hidden_channels = self.hidden_channels,
             layers = self.layers,
             heads = self.heads,
-            architecture="post"
+            architecture="post",
+            use_encodings=self.use_encodings
         )
 
         if self.strategy_weights == "compute":

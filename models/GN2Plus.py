@@ -22,7 +22,7 @@ class TN1(nn.Module):
     points_as_features:  bool
     errors_as_features:  bool
     scale:               bool
-    strategy_encodings:  str
+    use_encodings:       bool
 
     def debug_print(*args):
         for arg in args:
@@ -31,10 +31,12 @@ class TN1(nn.Module):
     def setup(self):
         assert((self.augment and self.strategy_prediction is not None) or not self.augment)
         self.preprocessor = PreProcessor(
+            # hidden_channels = self.hidden_channels+16,
             hidden_channels = self.hidden_channels,
             layers = self.layers,
             heads = self.heads,
-            architecture="post"
+            architecture="post",
+            use_encodings=self.use_encodings
         )
         # self.preprocessor2 = PreProcessor(
         #     hidden_channels = self.hidden_channels,
@@ -72,14 +74,6 @@ class TN1(nn.Module):
             self.scale_fn = lambda x: x
 
         if self.strategy_prediction in ("fit", "regression"):
-            # FIXME 
-            # self.apply_strategy_prediction_fn = Predictor(
-            #     hidden_channels=    self.hidden_channels,
-            #     layers=             self.layers,
-            #     heads=              self.heads,
-            #     strategy_sampling=  "compute",
-            #     method=             self.strategy_prediction
-            # )
             self.apply_strategy_prediction_fn = Predictor(
                 hidden_channels=         self.hidden_channels, #64,
                 layers=                  self.layers,  #3,
@@ -87,7 +81,8 @@ class TN1(nn.Module):
                 strategy_sampling=       "none",
                 strategy_weights=        "compute",
                 use_ghost_track=         False,
-                activation = "softmax",
+                use_encodings =          self.use_encodings,
+                activation =             "softmax",
                 method=                  self.strategy_prediction
             )
         elif self.strategy_prediction is not None:
@@ -142,34 +137,6 @@ class TN1(nn.Module):
             points = true_jet
             log_errors = jnp.zeros([x.shape[0], 3]) 
             return None, None, None, points, log_errors, None
-
-    def encodings_positional(self, x, ids):
-        num_jets, max_len, d_model = x.shape
-        pe = jnp.zeros(x.shape)
-        position = ids[:, :, None] # * 3
-        div_term = jnp.exp(jnp.arange(0, d_model, 2) * (-jnp.log(10000.0) / d_model))[:max_len]
-        div_term = jnp.repeat(div_term[:, None], num_jets, axis=1).T[:, :, None]
-        # print(ids.shape, position.shape, div_term.shape)
-        pe.at[:, :, 0::2].set(jnp.sin(position * div_term))
-        pe.at[:, :, 1::2].set(jnp.cos(position * div_term))
-        x = x + pe
-        # x = jnp.concatenate([x, pe], axis=2)
-        return x
-        
-    def encodings_one_hot(self, x, ids):
-        ids = jax.nn.one_hot(ids, ids.shape[1])
-
-        x = jnp.concatenate([x, ids], axis=2)
-        return x
-
-    def get_ids(self, x, mask, reverse_mode=True):
-        x = x[:, :, 0]
-        x = jnp.where(mask[:, :, 0], x, 0)
-        ids = jnp.argsort(x, axis=1)
-        if reverse_mode:
-            ids = ids[:, ::-1]
-        # ids = jnp.arange(x.shape[1])
-        return ids
     
     def add_reference(self, x, new_ref, new_ref_errors, t, g, mask):
         batch_size, n_tracks, _ = x.shape
@@ -211,36 +178,14 @@ class TN1(nn.Module):
 
 
         x_scaled = self.scale_fn(x_)
-        # x_rev    = x_scaled[:, ::-1, :]
-        
-        g_inv = None
-        if self.strategy_encodings is not None:
-            ids = self.get_ids(x_scaled, mask, reverse_mode=True)
-            ids_rev = self.get_ids(x_scaled, mask, reverse_mode=False)
-
-            x_scaled_fts = x_scaled
-            x_scaled = self.encodings_one_hot(x_scaled, ids)
-            ##x_rev    = self.encodings_one_hot(x_rev, ids)
-            # ids = (ids + 1) % 15
-            x_scaled_inv = self.encodings_one_hot(x_scaled_fts, ids_rev)
-            # ids_rev = (ids_rev - 1) % 15
-            # x3 = self.encodings_fn(xs2, ids_rev)
-            # x4 = self.encodings_fn(xs2, ids)
-            t_inv, g_inv = self.preprocessor(x_scaled_inv, mask)
 
         t, g = self.preprocessor(x_scaled, mask)
-        if g_inv is not None:
-            g = 0.5 * (g + g_inv)
-        # t2, g2 = self.preprocessor(x2, mask)
-        # t3, g3 = self.preprocessor(x3, mask)
-        # t4, g4 = self.preprocessor(x4, mask)
-        # g = .25 * (g + g2 + g3 + g4) 
-        ##g = 0.5 * (g + g_rev)
             
         if not fix:
             out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
         else:
             out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
+        
         _, _, _, out_mean, out_var, out_chi = out_preds
         
         repr_track = self.augment_fn(x, out_mean, out_var, t, g, mask)

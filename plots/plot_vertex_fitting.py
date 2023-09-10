@@ -102,7 +102,8 @@ def plot_bins(predictions, targets, result_fn, jet_var, save_dir, name, colors, 
         bins_values_std_aux = np.array(bins_values_std_aux)
 
         bins_values_mean.append(bins_values_aux.mean(axis=0))
-        bins_values_std.append(bins_values_std_aux.mean(axis=0))
+        bins_values_std.append(bins_values_aux.std(axis=0))
+        # bins_values_std.append(bins_values_std_aux.mean(axis=0))
 
 
     for i in range(len(bins)-2, 0, -1):
@@ -360,7 +361,7 @@ def plot_discriminated_by_flavour(predictions, errors, true_vtx, true_graph, jet
     with open("configs.json", "r") as f:
         settings = json.load(f)
         results_dir = settings['results_dir'] + "/" + var_dir
-        colors = settings['colors']
+        colors = settings['colors_flavours']
         labels_flav= settings['labels_graph']
 
     flavour_set = np.unique(true_graph)

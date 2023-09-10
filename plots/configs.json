@@ -1,10 +1,10 @@
 {
-    "results_dir": "../../plots/optimisers",
+    "results_dir": "../../models/tst4/plots",
     "models": [
-        "../../models/gn2_adamw_0001", "../../models/gn2_novograd_0001", "../../models/gn2ndive_novograd_0001"
+        "../../models/tst4"
     ],
     "labels_models": [
-        "gn2 adamw", "gn2 novograd", "gn2ndive novograd"
+        "reg encodings"
     ],
     "labels_graph": [
         "b", "c", "u"
@@ -24,6 +24,11 @@
         "blue", 
         "dodgerblue", 
         "skyblue"
+    ],
+    "colors_flavours": [
+        "forestgreen", 
+        "gold", 
+        "dodgerblue"
     ],
     "ground_truth": "../../ground_truth",
     "ground_truth_rachel": "../../DifferentiableVertexingProject",
