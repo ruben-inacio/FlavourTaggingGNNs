@@ -19,6 +19,7 @@ class TN1(nn.Module):
     heads:               int
     augment:             bool
     strategy_prediction: str
+    strategy_weights:    str
     points_as_features:  bool
     errors_as_features:  bool
     scale:               bool
@@ -79,7 +80,7 @@ class TN1(nn.Module):
                 layers=                  self.layers,  #3,
                 heads=                   self.heads,  #2,
                 strategy_sampling=       "none",
-                strategy_weights=        "compute",
+                strategy_weights=        self.strategy_weights,
                 use_ghost_track=         False,
                 use_encodings =          self.use_encodings,
                 activation =             "softmax",

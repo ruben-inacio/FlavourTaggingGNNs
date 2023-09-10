@@ -58,7 +58,6 @@ def train_step_pmap(key, state, batch_x, batch_y):
                 batch['n_tracks'],
                 batch['jet_phi'],
                 batch['jet_theta'],
-                fix=True
             )
             loss, losses = model.loss(out, batch, mask, mask_edges)
             return loss, losses
@@ -297,7 +296,7 @@ def train_epoch(state, dl, epoch, key, training):
 
         x = jnp.array(d.x, dtype=jnp.float64)
         y = jnp.array(d.y, dtype=jnp.float64)
-        # x, y =filter_jets(x, y)
+
 
         x = jax.tree_map(lambda m: m.reshape((DEVICE_COUNT, TRAIN_VMAP_COUNT, -1, *m.shape[1:])), x)
         y = jax.tree_map(lambda m: m.reshape((DEVICE_COUNT, TRAIN_VMAP_COUNT, -1, *m.shape[1:])), y)
@@ -305,11 +304,7 @@ def train_epoch(state, dl, epoch, key, training):
         if training:
             loss, loss_tasks, grads = train_step_pmap(key, state_dist, x, y)
             state = flax.jax_utils.unreplicate(state_dist)
-            # params_ndive = unfreeze(state.params)['apply_strategy_prediction_fn']
             state = update_model(state, grads)
-            # state.params = unfreeze(state.params)
-            # state.params['apply_strategy_prediction_fn'] = params_ndive
-            # state.params = freeze(state.params)
             state_dist = flax.jax_utils.replicate(state)
         else:
             loss, loss_tasks = eval_step_pmap(key, state_dist, x, y)
@@ -349,22 +344,6 @@ def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='a
 
     train_times = []
     valid_times = []
-    
-    # current_secs = datetime.datetime.now().second
-    # key = jax.random.PRNGKey(current_secs)
-    # t0_train = time.time()
-    # state, train_metrics, train_aux_metrics = train_epoch(state, train_dl, epoch, key, training=True, batch_size)
-    # t1_train = time.time()
-    # t0_valid = time.time()
-    # valid_metrics, valid_aux_metrics = train_epoch(state, valid_dl, epoch, key, training=False, batch_size)
-    # t1_valid = time.time()
-    # train_times.append(t1_train - t0_train)
-    # valid_times.append(t1_valid - t0_valid)
-    # print("TIME = ", t1_valid - t0_train)
-    # train_losses.append(float(train_metrics))
-    # valid_losses.append(float(valid_metrics))
-    # train_losses_aux.append(jnp.array(train_aux_metrics, dtype=float).tolist())
-    # valid_losses_aux.append(jnp.array(valid_aux_metrics, dtype=float).tolist())
 
     # while epoch < 200:
     while True:
@@ -514,8 +493,8 @@ if __name__ == "__main__":
     num_instances = sum([fn.startswith('loss_history') for fn in os.listdir(save_dir)])
     print("Number of instances already trained:", num_instances)
 
-    model = get_model(opt.model, save_dir=save_dir)
 
+    model = get_model(opt.model, save_dir=save_dir)
     for instance_id in range(num_instances, opt.ensemble_size):
         lr = opt.lr
         print("Instance number:", instance_id)

@@ -71,6 +71,14 @@ class Predictor(nn.Module):
 
         return weights
 
+    def apply_strategy_weights_compute(self, repr_track, mask, true_jet, true_trk):
+
+        weights = self.nn_sample(repr_track)
+        weights = jnp.where(mask, weights, jnp.array([-jnp.inf]))
+        weights = self.activation_fn(weights)
+        
+        return weights
+
     def sample_bernoulli(self, w):
         current_date = datetime.datetime.now()
         key = jax.random.PRNGKey(current_date.second)
@@ -81,14 +89,6 @@ class Predictor(nn.Module):
 
     def sample_none(self, w):
         return w
-
-    def apply_strategy_weights_compute(self, repr_track, mask, true_jet, true_trk):
-
-        weights = self.nn_sample(repr_track)
-        weights = jnp.where(mask, weights, jnp.array([-jnp.inf]))
-        weights = self.activation_fn(weights)
-        
-        return weights
 
     def add_ghost_track(self, x, mask, n_tracks, jet_phi, jet_theta):
         num_jets, max_num_tracks, _ = x.shape
