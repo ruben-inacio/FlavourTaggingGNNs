@@ -4,7 +4,7 @@
         "layers": 3,
         "heads": 2,
         "augment": false,
-        "strategy_prediction": null,
+        "strategy_prediction": "fit",
         "strategy_weights": "compute",
         "points_as_features": false,
         "errors_as_features": false,
@@ -15,11 +15,11 @@
         "hidden_channels": 32,
         "layers": 3,
         "heads": 2,
-        "strategy_weights": "perfect",
-        "strategy_sampling": "none",
+        "strategy_weights": "compute",
+        "strategy_sampling": null,
         "activation": "softmax",
         "use_ghost_track": false,
-        "use_encodings": true,
-        "method": "regression"
+        "use_encodings": false,
+        "method": "fit"
     }
 }

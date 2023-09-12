@@ -52,10 +52,10 @@ class TN1(nn.Module):
         self.extraplator = None
         if self.augment:
             self.extrapolator = extrapolation
-            # self.augm_encoder = Encoder(
-            #     hidden_channels=self.hidden_channels,
-            #     heads=self.heads,
-            #     layers=self.layers,
+            # self.processor = PreProcessor(
+            #     hidden_channels = self.hidden_channels,
+            #     layers = self.layers,
+            #     heads = self.heads,
             #     architecture="post"
             # )
             # self.augm_lin = nn.Dense(features=self.hidden_channels)	
@@ -79,7 +79,7 @@ class TN1(nn.Module):
                 hidden_channels=         self.hidden_channels, #64,
                 layers=                  self.layers,  #3,
                 heads=                   self.heads,  #2,
-                strategy_sampling=       "none",
+                strategy_sampling=       None,
                 strategy_weights=        self.strategy_weights,
                 use_ghost_track=         False,
                 use_encodings =          self.use_encodings,
@@ -155,10 +155,6 @@ class TN1(nn.Module):
                 x_prime = jnp.concatenate([x_prime, x_errors], axis=2)
                 
         x_prime = self.scale_fn(x_prime)
-        
-        if self.strategy_encodings is not None:
-            ids = self.get_ids(x_prime, mask, reverse_mode=False)
-            x_prime = self.encodings_one_hot(x_prime, ids)
 
         t_prime, g_prime = self.preprocessor(x_prime, mask)
         
@@ -243,7 +239,7 @@ class TN1(nn.Module):
         loss_edges = jnp.mean(loss_edges, where=mask_edges)
 
         if out_mean is not None: 
-            loss_predictor = squared_error(batch['jet_vtx'], out_mean)
+            loss_predictor = jnp.abs(batch['jet_vtx'] - out_mean)
             loss_predictor = jnp.mean(loss_predictor)
         else:
             loss_predictor = 0

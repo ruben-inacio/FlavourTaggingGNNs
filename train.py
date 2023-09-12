@@ -57,7 +57,7 @@ def train_step_pmap(key, state, batch_x, batch_y):
                 batch['trk_vtx'],
                 batch['n_tracks'],
                 batch['jet_phi'],
-                batch['jet_theta'],
+                batch['jet_theta']
             )
             loss, losses = model.loss(out, batch, mask, mask_edges)
             return loss, losses
@@ -492,9 +492,9 @@ if __name__ == "__main__":
     optimiser = opt.optimiser
     num_instances = sum([fn.startswith('loss_history') for fn in os.listdir(save_dir)])
     print("Number of instances already trained:", num_instances)
-
-
+    
     model = get_model(opt.model, save_dir=save_dir)
+
     for instance_id in range(num_instances, opt.ensemble_size):
         lr = opt.lr
         print("Instance number:", instance_id)
@@ -510,4 +510,3 @@ if __name__ == "__main__":
         # if opt.save_plot_data:
         #     store_predictions(model, params, test_dl, save_dir, save_truth=False)
             # store_predictions(state.params, test_dl, save_dir, ensemble_id=instance_id)
-

@@ -46,9 +46,11 @@ class Predictor(nn.Module):
             self.activation_fn = lambda x: nn.activation.softmax(x, axis=1)
 
         self.apply_strategy_weights_fn = eval("self.apply_strategy_weights_" + self.strategy_weights)
-        self.sample_fn = eval("self.sample_" + self.strategy_sampling)
-        if self.strategy_sampling != "none":
+        if self.strategy_sampling is not None:
+            self.sample_fn = eval("self.sample_" + self.strategy_sampling)
             self.sample_fn = lambda *args: jax.lax.stop_gradient(self.sample_fn(*args))
+        else:
+            self.sample_fn = lambda *args: args
 
         if self.method == "regression":
             self.fitting_method = Regression(hidden_channels=self.hidden_channels)
@@ -85,9 +87,6 @@ class Predictor(nn.Module):
         selection = jax.random.bernoulli(key, w) # jnp.sqrt(w))
         w = selection * w
         w = nn.activation.softmax(w, axis=1)
-        return w
-
-    def sample_none(self, w):
         return w
 
     def add_ghost_track(self, x, mask, n_tracks, jet_phi, jet_theta):
@@ -139,10 +138,10 @@ class Predictor(nn.Module):
         t, g = self.preprocessor(x, mask)
 
 	        	
-        # if isinstance(self.fitting_method, Regression):	
-        repr_track = jnp.concatenate([t, g], axis=2)	
-        # else:	
-        #       repr_track = g	
+        if isinstance(self.fitting_method, Regression):	
+            repr_track = jnp.concatenate([t, g], axis=2)	
+        else:	
+            repr_track = g	
 
 
         weights = self.apply_strategy_weights_fn(repr_track, mask, true_jet, true_trk)   
@@ -165,14 +164,16 @@ class Predictor(nn.Module):
     def loss(self, out, batch, mask, mask_edges):
         _, _, _, out_mean, out_var, out_chi = out
 
-        ##loss_f = jnp.sqrt(jnp.sum((batch['jet_vtx']-out_mean)**2, axis=1))
+        # loss_f = jnp.sqrt(jnp.sum((batch['jet_vtx']-out_mean)**2, axis=1))
 
         # valid = jnp.any(jnp.any(batch['trk_y'], axis=2), axis=1) # 250 x15 
 
 
         ##loss_f = jnp.mean(loss_f)#, where=valid) #, where=batch['jet_y'][:, 0] != 1)
         # loss_g = gaussian_neg_loglikelihood(batch['jet_vtx'], out_mean, jnp.exp(out_var))
-        loss_f = squared_error(batch['jet_vtx'], out_mean)
+        #  loss_f = squared_error(batch['jet_vtx'], out_mean)
+        loss_f = jnp.abs(batch['jet_vtx'] - out_mean)
+        loss_f = jnp.mean(loss_f)
 
         # loss_f = jnp.sqrt(jnp.sum((batch['jet_vtx']-out_mean)**2, axis=1))
         # weights = jnp.log(batch['x'][:, 0, 16])
