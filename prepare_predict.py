@@ -86,22 +86,23 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
             jet_pts.append(x[:, 0, 26])
             jet_etas.append(x[:, 0, 27])
             jet_trks.append(x[:, 0, 22])
+            batch = get_batch(x, y)
+            
+            mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+            mask = mask[:, :, 0]
+            mask_edges = mask_edges.reshape(-1, 225)
+            
+            trk_y = np.argmax(batch['trk_y'], axis=2)
+            trk_y = np.where(mask, trk_y, -1).reshape(-1) #trk_y[mask].reshape(-1)
+            true_nodes.append(trk_y)
 
+            edge_y = np.argmax(batch['edge_y'], axis=2)
+            edge_y = np.where(mask_edges, edge_y, -1).reshape(-1) # edge_y[mask_edges].reshape(-1)
+            true_edges.append(edge_y)
+    
             if not truth_only:
-                batch = get_batch(x, y)
-                mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
                 out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step(params, batch)
-                mask = mask[:, :, 0]
-                mask_edges = mask_edges.reshape(-1, 225)
-
-                trk_y = np.argmax(batch['trk_y'], axis=2)
-                trk_y = np.where(mask, trk_y, -1).reshape(-1) #trk_y[mask].reshape(-1)
-                true_nodes.append(trk_y)
-
-                edge_y = np.argmax(batch['edge_y'], axis=2)
-                edge_y = np.where(mask_edges, edge_y, -1).reshape(-1) # edge_y[mask_edges].reshape(-1)
-                true_edges.append(edge_y)
-
+                
                 if out_nodes is not None:
                     pred_nodes.append(out_nodes)#[mask])
                 if out_edges is not None:
@@ -134,6 +135,7 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
     true = np.concatenate(true)
     true_flavours = np.concatenate(true_flavours)
     jet_pts = np.concatenate(jet_pts)
+    jet_etas = np.concatenate(jet_etas)
     jet_trks = np.concatenate(jet_trks)
     
     true_nodes = np.concatenate(true_nodes)

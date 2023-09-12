@@ -30,7 +30,8 @@ class Predictor(nn.Module):
             layers = self.layers,
             heads = self.heads,
             architecture="post",
-            use_encodings=self.use_encodings
+            use_encodings=self.use_encodings,
+            num_graphs=1
         )
 
         if self.strategy_weights == "compute":
