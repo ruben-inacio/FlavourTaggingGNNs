@@ -138,6 +138,9 @@ def prepare_ROC_jet_ATLAS_bcujets(pred, true, f=0.05, rej_threshold=100.0):
 
 
 def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
+    font = {'family' : 'sans-serif',
+        'size'   : 18}
+    plt.rc('font', **font)
     fig, ax = plt.subplots(2, 2 ,figsize=(16,8),gridspec_kw={'height_ratios': [2, 1]})
 
     # Upper panel (ROC)
@@ -229,28 +232,9 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
     plt.tight_layout()
     plt.savefig(f"{save_dir}/ATLAS_roc_ensemble_bcu.pdf")
     plt.close()
-    
+    reset_font()
     return    
 
-def compare_models_eff_ATLASv2(jet_results, colors, save_dir, labels, jet_var, *args):
-    print(np.array(jet_results).shape)
-    for t in range(len(jet_results)):
-        bins_values_aux = []
-        bins_values_std_aux = []
-        for inst in range(len(jet_results[t])):
-            print(jet_results[t][inst].shape)
-            m, std = assign_bins(jet_results[t][inst], jet_var=jet_var[t], bins=bins)
-            bins_values_aux.append(m)
-            bins_values_std_aux.append(std)
-        bins_values_aux = np.array(bins_values_aux)
-        bins_values_std_aux = np.array(bins_values_std_aux)
-
-        bins_values_mean.append(bins_values_aux.mean(axis=0))
-        bins_values_std.append(bins_values_std_aux.mean(axis=0))
-
-    for m, model_results in enumerate(jet_results):
-        pass
-    exit(0)
 
 def compute_threshold(jet_flavours, discriminator, rejection_threshold=45.0, rejection_type='u'):
     if type(jet_flavours) != np.ndarray:
@@ -489,7 +473,7 @@ def plot_classifications(predictions, targets, labels, labels_key):
 
 
 
-def performance_cmp_jets(predictions, true_flavours, labels, jet_pts):
+def performance_cmp_jets(predictions, true_flavours, labels, jet_pts, jet_etas):
 
     results = []
     for t in range(len(predictions)):
@@ -509,3 +493,4 @@ def performance_cmp_jets(predictions, true_flavours, labels, jet_pts):
     compare_models_discriminator_ATLAS(predictions, true_flavours, results_dir, labels)
     compare_models_jet_ATLAS(results, colors, results_dir, labels)
     compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_pts, true_flavours, [20, 40, 60, 80, 100, 200], "pt", r"Jet $p_{T}$ [GeV]")
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, [-2.5, -1.5, -.5, .5, 1.5, 2.5], "eta", r"Jet $\eta$")

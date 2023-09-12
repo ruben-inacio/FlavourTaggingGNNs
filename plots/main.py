@@ -45,6 +45,7 @@ if __name__ == "__main__":
 
     # Ground truth information
     jet_pts    = np.load(f'{settings["ground_truth"]}/jet_pts.npy')
+    jet_etas   = np.load(f'{settings["ground_truth"]}/jet_etas.npy')
     jet_trks   = np.load(f'{settings["ground_truth"]}/jet_trks.npy')
     true_vtx   = np.load(f'{settings["ground_truth"]}/jet_vtx.npy')
     true_nodes = np.load(f'{settings["ground_truth"]}/trk_y.npy')
@@ -148,7 +149,7 @@ if __name__ == "__main__":
         plot_fitting_average(predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, labels, [20, 40, 60, 80, 100, 200])
 
     if do_jet_cmp:
-        performance_cmp_jets(predictions_graph_clf, true_graph, labels, jet_pts)
+        performance_cmp_jets(predictions_graph_clf, true_graph, labels, jet_pts, jet_etas)
 
     if do_classifications:
         plot_classifications(predictions_graph_clf, true_graph, labels, "graph")

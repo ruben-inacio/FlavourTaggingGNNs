@@ -13,9 +13,10 @@ class PreProcessor(nn.Module):
     layers: int
     architecture: str
     use_encodings: bool
+    num_graphs: int 
 
     def setup(self):
-        last_dim = self.hidden_channels - 15 * self.use_encodings
+        last_dim = self.hidden_channels - 15 * self.use_encodings * self.num_graphs
 
         self.track_init = nn.Sequential([
             nn.Dense(features=self.hidden_channels, param_dtype=jnp.float64),
@@ -41,9 +42,9 @@ class PreProcessor(nn.Module):
         x = jnp.concatenate([x, ids], axis=2)
         return x
 
-    def get_ids(self, x, mask, reverse_mode=True):
+    def get_ids(self, x, mask, reverse_mode=True, var_id=0):
         x = x[:, :, 0]
-        x = jnp.where(mask[:, :, 0], x, 0)
+        x = jnp.where(mask[:, :, var_id], x, 0)
         ids = jnp.argsort(x, axis=1)
         if reverse_mode:
             ids = ids[:, ::-1]

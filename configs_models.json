@@ -3,7 +3,7 @@
         "hidden_channels": 32,
         "layers": 3,
         "heads": 2,
-        "augment": false,
+        "augment": true,
         "strategy_prediction": "fit",
         "strategy_weights": "compute",
         "points_as_features": false,

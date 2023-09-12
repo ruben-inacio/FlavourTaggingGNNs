@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument('-save_dir', default=DEFAULT_MODEL_DIR, help="Directory to store results.")
     parser.add_argument('-name', default="test", type=str)
     parser.add_argument('-model', type=str)
+    parser.add_argument('-truth_only', default=False, type=bool)
     return parser.parse_args()
 
 
@@ -55,12 +56,13 @@ def test_step(params, batch):
         batch['jet_theta'],
     )[:6]
 
-def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, ensemble_id=0):
+def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, ensemble_id=0, truth_only=False):
     pred_mu = []
     pred_sigma = []
     true = []
     true_flavours = []
     jet_pts = []
+    jet_etas = []
     jet_trks = []
 
     true_nodes = []
@@ -82,42 +84,44 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
             y = np.array(y)
         
             jet_pts.append(x[:, 0, 26])
+            jet_etas.append(x[:, 0, 27])
             jet_trks.append(x[:, 0, 22])
+
+            if not truth_only:
+                batch = get_batch(x, y)
+                mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+                out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step(params, batch)
+                mask = mask[:, :, 0]
+                mask_edges = mask_edges.reshape(-1, 225)
+
+                trk_y = np.argmax(batch['trk_y'], axis=2)
+                trk_y = np.where(mask, trk_y, -1).reshape(-1) #trk_y[mask].reshape(-1)
+                true_nodes.append(trk_y)
+
+                edge_y = np.argmax(batch['edge_y'], axis=2)
+                edge_y = np.where(mask_edges, edge_y, -1).reshape(-1) # edge_y[mask_edges].reshape(-1)
+                true_edges.append(edge_y)
+
+                if out_nodes is not None:
+                    pred_nodes.append(out_nodes)#[mask])
+                if out_edges is not None:
+                    pred_edges.append(out_edges)#[mask_edges])
+                if out_graph is not None:
+                    pred_flavours.append(out_graph)
         
-            batch = get_batch(x, y)
-            mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
-            out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step(params, batch)
-            mask = mask[:, :, 0]
-            mask_edges = mask_edges.reshape(-1, 225)
+                this_pred_mu, this_pred_var = p_mu, p_var 
 
-            trk_y = np.argmax(batch['trk_y'], axis=2)
-            trk_y = np.where(mask, trk_y, -1).reshape(-1) #trk_y[mask].reshape(-1)
-            true_nodes.append(trk_y)
-
-            edge_y = np.argmax(batch['edge_y'], axis=2)
-            edge_y = np.where(mask_edges, edge_y, -1).reshape(-1) # edge_y[mask_edges].reshape(-1)
-            true_edges.append(edge_y)
-
-            if out_nodes is not None:
-                pred_nodes.append(out_nodes)#[mask])
-            if out_edges is not None:
-                pred_edges.append(out_edges)#[mask_edges])
-            if out_graph is not None:
-                pred_flavours.append(out_graph)
-    
-            this_pred_mu, this_pred_var = p_mu, p_var 
-
-            if this_pred_mu is not None:
-                if scy is not None:
-                    this_pred_mu = np.array(scy.inverse_transform(this_pred_mu))
-                pred_mu.append(this_pred_mu)
-            
-            if this_pred_var is not None:
-                this_pred_sigma = this_pred_var
-                # this_pred_sigma = np.sqrt(np.exp(this_pred_var))
-                if scy is not None:
-                    this_pred_sigma = np.array(scy.inverse_transform(this_pred_sigma.reshape(-1,3)))
-                pred_sigma.append(this_pred_sigma)
+                if this_pred_mu is not None:
+                    if scy is not None:
+                        this_pred_mu = np.array(scy.inverse_transform(this_pred_mu))
+                    pred_mu.append(this_pred_mu)
+                
+                if this_pred_var is not None:
+                    this_pred_sigma = this_pred_var
+                    # this_pred_sigma = np.sqrt(np.exp(this_pred_var))
+                    if scy is not None:
+                        this_pred_sigma = np.array(scy.inverse_transform(this_pred_sigma.reshape(-1,3)))
+                    pred_sigma.append(this_pred_sigma)
             
             this_true = batch['jet_vtx'] # d.jet_vtx.reshape(-1, 3)
             if scy is not None:
@@ -159,6 +163,7 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
     print(true.shape)
     print(true_flavours.shape)
     print(jet_pts.shape)
+    print(jet_etas.shape)
     print(jet_trks.shape)
     print(true_edges.shape)
     print(true_nodes.shape)
@@ -170,15 +175,21 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
         np.save('../ground_truth/edge_y.npy', true_edges)
         np.save('../ground_truth/jet_y.npy', true_flavours)
         np.save('../ground_truth/jet_pts.npy', jet_pts)
+        np.save('../ground_truth/jet_etas.npy', jet_etas)
         np.save('../ground_truth/jet_trks.npy', jet_trks)
 
 
     return pred_mu, pred_sigma, true, true_flavours, jet_pts, jet_trks   
 
+
 if __name__ == '__main__':
     opt = parse_args()
 
     test_dl = torch.load("%s/test_dl.pth"%(opt.input_dir))
+
+    if opt.truth_only:
+        store_predictions(None, None, test_dl, None, save_truth=True, truth_only=True)
+        exit(0)
 
     save_dir = opt.save_dir + "/" + opt.name
 
