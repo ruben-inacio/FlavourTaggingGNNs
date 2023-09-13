@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import jax
 
 from utils.layers import Encoder 
+from models.IDEncoder import IDEncoder
 
 class PreProcessor(nn.Module):
     hidden_channels: int
@@ -13,6 +14,7 @@ class PreProcessor(nn.Module):
     layers: int
     architecture: str
     use_encodings: bool
+    encoding_strategy: str
     num_graphs: int 
 
     def setup(self):
@@ -37,44 +39,26 @@ class PreProcessor(nn.Module):
             architecture=self.architecture
         )
 
-    def get_encodings(self, x, ids):
-        ids = jax.nn.one_hot(ids, ids.shape[1])
-        x = jnp.concatenate([x, ids], axis=2)
-        return x
+        self.rpgnn = IDEncoder(pooling_strategy=self.encoding_strategy)
 
-    def get_ids(self, x, mask, reverse_mode=True, var_id=0):
-        x = x[:, :, 0]
-        x = jnp.where(mask[:, :, var_id], x, 0)
-        ids = jnp.argsort(x, axis=1)
-        if reverse_mode:
-            ids = ids[:, ::-1]
-        # ids = jnp.arange(x.shape[1])
-        return ids
-
-    def __call__(self, x, mask=None):
+    # FIXME remove last arg, shouldn't be needed with the IDEncoder file
+    def __call__(self, x, mask=None, embed=None):
         if mask is None:
             mask = jnp.ones((x.shape[0], 1))
 
         x = x * mask
-
-        t = self.track_init(x)
+        if embed is None:
+            t = self.track_init(x)
+        else: 
+            t = embed
         t = t * mask
 
         if self.use_encodings:
-            ids = self.get_ids(x, mask, reverse_mode=True)
-            ids_rev = self.get_ids(x, mask, reverse_mode=False)
-
-            t_rp = self.get_encodings(t, ids)
-            t_rp_inv = self.get_encodings(t, ids_rev)
-            
-            g = self.encoder(t_rp, mask=mask)
-            g_inv = self.encoder(t_rp_inv, mask=mask)
-
-            g = 0.5 * (g + g_inv)
-
+            g = self.rpgnn(self.encoder, x, t, mask)
         else:
             g = self.encoder(t, mask=mask)
-            g = g * mask
+        
+        g = g * mask
 
         return t, g
 

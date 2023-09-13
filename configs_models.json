@@ -3,13 +3,14 @@
         "hidden_channels": 32,
         "layers": 3,
         "heads": 2,
-        "augment": true,
-        "strategy_prediction": "fit",
+        "augment": false,
+        "strategy_prediction": null,
         "strategy_weights": "compute",
         "points_as_features": false,
         "errors_as_features": false,
         "scale": false,
-        "use_encodings": true
+        "use_encodings": true,
+        "encoding_strategy": "simple_eye"
     },
     "predictor": {
         "hidden_channels": 32,

@@ -24,6 +24,7 @@ class TN1(nn.Module):
     errors_as_features:  bool
     scale:               bool
     use_encodings:       bool
+    encoding_strategy:   str
 
     def debug_print(*args):
         for arg in args:
@@ -38,6 +39,7 @@ class TN1(nn.Module):
             heads = self.heads,
             architecture="post",
             use_encodings=self.use_encodings,
+            encoding_strategy=self.encoding_strategy,
             num_graphs=1
         )
         # self.preprocessor2 = PreProcessor(
@@ -54,11 +56,12 @@ class TN1(nn.Module):
         if self.augment:
             self.extrapolator = extrapolation
             self.processor = PreProcessor(
-                hidden_channels = 2*self.hidden_channels,
+                hidden_channels = self.hidden_channels+30,
                 layers = self.layers,
                 heads = self.heads,
                 architecture="post",
                 use_encodings=self.use_encodings,
+                encoding_strategy =self.encoding_strategy,
                 num_graphs=2
             )
             self.augm_lin = nn.Dense(features=self.hidden_channels)	
@@ -161,19 +164,16 @@ class TN1(nn.Module):
 
         t_prime, g_prime = self.preprocessor(x_prime, mask)
         
-        x_all = jnp.concatenate([x, x_prime], axis=1)
-        mask_all = jnp.concatenate([mask, mask], axis=1)
-        t_all, g_all = self.processor(x_all, mask_all)	
-        g_all = jnp.concatenate([g_all[:, :n_tracks, :], g_all[:, n_tracks:, :]], axis=2)	
-        g_all = self.augm_lin(g_all)	
-        # t_mixed = jnp.concatenate([t, t_prime], axis=1)	
-        # mask_mixed = jnp.concatenate([mask, mask], axis=1)	
-        # g_mixed = self.augm_encoder(t_mixed, mask=mask_mixed)	
-        # g_mixed = jnp.concatenate([g_mixed[:, :n_tracks, :], g_mixed[:, n_tracks:, :]], axis=2)	
-        # g_mixed = self.augm_lin(g_mixed)	
-        # repr_track = jnp.concatenate([g, g_prime, g_mixed], axis=2)
+        # WORK IN PROGRESS 13/set
+        # x_all = jnp.concatenate([x, x_prime], axis=1)
+        # g_all = jnp.concatenate([g, g_prime], axis=1)
+        # mask_all = jnp.concatenate([mask, mask], axis=1)
+        # _, g_all = self.processor(x_all, mask_all, embed=g_all)	
+        # g_all = jnp.concatenate([g_all[:, :n_tracks, :], g_all[:, n_tracks:, :]], axis=2)	
+        # g_all = self.augm_lin(g_all)
+        # repr_track = jnp.concatenate([g, g_all], axis=2)
 
-        repr_track = jnp.concatenate([g, g_all], axis=2)
+        repr_track = jnp.concatenate([g, g_prime], axis=2)
 
         return repr_track
 

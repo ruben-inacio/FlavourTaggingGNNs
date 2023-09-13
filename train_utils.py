@@ -102,12 +102,9 @@ def mark_params(params, flag):
 
 
 def mask_predictor(params):
-    params['mlp_graph'] = mark_params(params['mlp_graph'], False)
-    params['mlp_nodes'] = mark_params(params['mlp_nodes'], False)
-    params['mlp_edges'] = mark_params(params['mlp_edges'], False)
-    params['gate_nn'] = mark_params(params['gate_nn'], False)
-    params['preprocessor'] = mark_params(params['preprocessor'], False)
-    params['apply_strategy_prediction_fn'] = mark_params(params['apply_strategy_prediction_fn'], True)
+    for k in params.keys():
+        params[k] =  mark_params(params[k], k == 'apply_strategy_prediction_fn')
+        
     return params
 
 
@@ -124,6 +121,7 @@ def create_train_state(rng, learning_rate, model=None, params=None, optimiser='a
             batch['jet_phi'],
             batch['jet_theta']
         )['params']
+        
         if "Predictor" not in str(type(model)):
             pass
             # print("Loading NDIVE")

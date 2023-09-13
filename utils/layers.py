@@ -64,6 +64,9 @@ class EncoderLayer(nn.Module):
         pass
 
     def __call__(self, x, y, mask=None):
+        if mask is not None:
+            x = x * mask
+            y = y * mask
         x = self.fwd_fn(x, y)
         return x
 
