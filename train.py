@@ -345,7 +345,7 @@ def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='a
     train_times = []
     valid_times = []
     if loss_init is not None:
-        early_stop.update(valid_metrics)
+        early_stop.update(loss_init)
     # while epoch < 200:
     while True:
         current_secs = datetime.datetime.now().second
