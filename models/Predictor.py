@@ -23,6 +23,7 @@ class Predictor(nn.Module):
     activation: str
     method: str
     use_encodings: bool
+    encoding_strategy: str
 
     def setup(self):
         self.preprocessor = PreProcessor(
@@ -31,6 +32,7 @@ class Predictor(nn.Module):
             heads = self.heads,
             architecture="post",
             use_encodings=self.use_encodings,
+            encoding_strategy=self.encoding_strategy,
             num_graphs=1
         )
 

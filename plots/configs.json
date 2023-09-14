@@ -1,10 +1,10 @@
 {
     "results_dir": "../../comparisons/gn2_vs_gn2_encodings",
     "models": [
-        "../../final_results/gn2_adamw001_batch250", "../../final_results/gn2_encodings_adamw001"
+        "../../final_results/gn2_adamw001_batch250", "../../final_results/gn2_encodings_adamw001",  "../../final_results/gn2_encodings_simple_eye_adamw001"
     ],
     "labels_models": [
-        "GN2", "GN2 (Encodings)"
+        "GN2", "GN2 (Encodings bug)", "GN2 (Encodings)"
     ],
     "labels_graph": [
         "b", "c", "u"

@@ -90,7 +90,8 @@ class TN1(nn.Module):
                 use_ghost_track=         False,
                 use_encodings =          False, #self.use_encodings,
                 activation =             "softmax",
-                method=                  self.strategy_prediction
+                method=                  self.strategy_prediction,
+                encoding_strategy="simple_eye"
             )
         elif self.strategy_prediction is not None:
             self.apply_strategy_prediction_fn = eval("self.apply_prediction_" + self.strategy_prediction)
@@ -193,7 +194,7 @@ class TN1(nn.Module):
 
         t, g = self.preprocessor(x_scaled, mask)
             
-        if False and not fix:
+        if not fix:
             out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
         else:
             out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))

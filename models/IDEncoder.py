@@ -63,9 +63,12 @@ class IDEncoder(nn.Module):
         return 0.5 * (g + g_inv)
     
     def encode_simple_random(self, encoder, x, t, mask):
-        ids = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
-        key = jax.random.PRNGKey(time.time_ns() % 100)
-        ids_rev = jax.random.permutation(key, ids, axis=1)
+        identities = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
+        t = time.time_ns() % 100
+        key = jax.random.PRNGKey(t)
+        ids = jax.random.permutation(key, identities, axis=1)
+        key = jax.random.PRNGKey(t+1)
+        ids_rev = jax.random.permutation(key, identities, axis=1)
 
         t_rp = self.get_encodings(t, ids) * mask
         t_rp_inv = self.get_encodings(t, ids_rev) * mask
