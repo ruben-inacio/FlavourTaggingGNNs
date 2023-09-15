@@ -17,15 +17,23 @@ class IDEncoder(nn.Module):
         x = jnp.concatenate([x, ids], axis=2)
         return x
 
-    def get_ids(self, x, mask, reverse_mode=True, var_id=0):
+    def get_encodings_feature(self, x, t, mask, decreasing=True, var_id=0):
+
         x = x[:, :, var_id]
         x = jnp.where(mask[:, :, var_id], x, 0)
-        ids = jnp.argsort(x, axis=1)
-        if reverse_mode:
-            ids = ids[:, ::-1]
-
-        return ids
-
+        idx_argsort = jnp.argsort(x, axis=1)
+        if decreasing:
+            idx_argsort = idx_argsort[:, ::-1]
+    
+        idx_inv_argsort = jnp.argsort(idx_argsort, axis=1)
+        eye = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
+        eye = jax.nn.one_hot(eye, eye.shape[1])
+    
+        sorted_t = t[:, idx_argsort][jnp.diag_indices(t.shape[0])]
+        sorted_t = jnp.concatenate([sorted_t, eye], axis=2)
+        res = sorted_t[:, idx_inv_argsort][jnp.diag_indices(sorted_t.shape[0])]
+        return res
+    """
     def encode_simple_reversed(self, encoder, x, t, mask):
         ids = self.get_ids(x, mask, reverse_mode=True)
         ids_rev = self.get_ids(x, mask, reverse_mode=False)
@@ -37,7 +45,8 @@ class IDEncoder(nn.Module):
         g_inv = encoder(t_rp_inv, mask=mask)
 
         return 0.5 * (g + g_inv)
-
+    """
+    
     def encode_simple_eye(self, encoder, x, t, mask):
         ids = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
         ids_rev = jnp.stack([jnp.arange(0, x.shape[1])][::-1] * x.shape[0], axis=0)
@@ -51,10 +60,10 @@ class IDEncoder(nn.Module):
         return 0.5 * (g + g_inv)
 
     def encode_simple_pt(self, encoder, x, t, mask):
-        ids = self.get_ids(x, mask, reverse_mode=True)
+        ids = self.get_encodings_feature(x, t, mask, decreasing=True)
         ids_rev = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
 
-        t_rp = self.get_encodings(t, ids) * mask
+        t_rp = ids * mask # self.get_encodings(t, ids) * mask
         t_rp_inv = self.get_encodings(t, ids_rev) * mask
             
         g = encoder(t_rp, mask=mask)
@@ -64,7 +73,7 @@ class IDEncoder(nn.Module):
     
     def encode_simple_random(self, encoder, x, t, mask):
         identities = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
-        key_t = time.time_ns() % 100
+        key_t = 0 #time.time_ns() % 100
         key = jax.random.PRNGKey(key_t)
         ids = jax.random.permutation(key, identities, axis=1)
         ids_rev = jax.random.permutation(key, ids, axis=1)
@@ -76,6 +85,28 @@ class IDEncoder(nn.Module):
         g_inv = encoder(t_rp_inv, mask=mask)
 
         return 0.5 * (g + g_inv)
+    
+    
+    def encode_best(self, encoder, x, t, mask):
+        ids_eye = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
+        ids_rev = jnp.stack([jnp.arange(0, x.shape[1])][::-1] * x.shape[0], axis=0)
+        ids_pt = self.get_encodings_feature(x, t, mask, decreasing=True)
+        ids_rho = self.get_encodings_feature(x, t, mask, decreasing=True, var_id=5)
+        ids_deltar = self.get_encodings_feature(x, t, mask, decreasing=True, var_id=7)
+        
+        t_eye = self.get_encodings(t, ids_eye) * mask
+        t_rev = self.get_encodings(t, ids_rev) * mask
+        t_pt = ids_pt * mask
+        t_rho = ids_rho * mask
+        t_deltar = ids_deltar * mask
+        
+        g_eye = encoder(t_eye, mask=mask)
+        g_rev = encoder(t_rev, mask=mask)
+        g_pt = encoder(t_pt, mask=mask)
+        g_rho = encoder(t_rho, mask=mask)
+        g_deltar = encoder(t_deltar, mask=mask)
+        return 0.2 * (g_eye + g_rev + g_pt + g_rho + g_deltar)
+        
     
     def __call__(self, encoder, x, t, mask=None):
         return self.pooling_fn(encoder, x, t, mask)

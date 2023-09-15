@@ -283,7 +283,7 @@ def warmup_model(batch_size, state, train_dl, valid_dl, save_dir, ensemble_id=0,
         }, indent=4)
         histf.write(r)
 
-    return state, min(valid_losses)
+    return state, early_stop
 
 
 def train_epoch(state, dl, epoch, key, training): 
@@ -330,8 +330,9 @@ def train_epoch(state, dl, epoch, key, training):
         return running_loss, running_loss_aux
 
 
-def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam', lr=LR_INIT, loss_init=None):
-    early_stop = EarlyStopping(min_delta=1e-6, patience=20)
+def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='adam', lr=LR_INIT, early_stop=None):
+    if early_stop is None:
+        early_stop = EarlyStopping(min_delta=1e-6, patience=20)
     epoch = 0
     ckpt = None
     counter_improvement = 0
@@ -344,8 +345,7 @@ def train_model(state, train_dl, valid_dl, save_dir, ensemble_id=0, optimiser='a
 
     train_times = []
     valid_times = []
-    if loss_init is not None:
-        early_stop.update(loss_init)
+    
     # while epoch < 200:
     while True:
         current_secs = datetime.datetime.now().second
@@ -502,9 +502,9 @@ if __name__ == "__main__":
         rng, state = init_model(rng, model, optimiser, lr=opt.lr)
         print(type(model))
         if lr > .0005 and isinstance(model, TN1):
-            state, loss_min = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr)
+            state, early_stop = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr)
             lr = lr / 10
-        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr, loss_init=loss_min)
+        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr, early_stop=early_stop)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
         state = ckpt['model']
