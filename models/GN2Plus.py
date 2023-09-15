@@ -10,6 +10,7 @@ from utils.layers import GlobalAttention, EncoderLayer, Encoder
 from utils.losses import *
 from models.PreProcessor import PreProcessor
 from models.Predictor import Predictor
+from models.IDEncoder import IDEncoder
 from utils.extrapolation import extrapolation
 
 
@@ -55,15 +56,14 @@ class TN1(nn.Module):
         self.extraplator = None
         if self.augment:
             self.extrapolator = extrapolation
-            self.processor = PreProcessor(
-                hidden_channels = self.hidden_channels+30,
-                layers = self.layers,
-                heads = self.heads,
-                architecture="post",
-                use_encodings=self.use_encodings,
-                encoding_strategy =self.encoding_strategy,
-                num_graphs=2
+            self.encoder = Encoder(
+                hidden_channels=self.hidden_channels+30, 
+                heads=self.heads, 
+                layers=self.layers, 
+                architecture="post"
             )
+            self.rpgnn = IDEncoder(pooling_strategy=self.encoding_strategy)
+
             self.augm_lin = nn.Dense(features=self.hidden_channels)	
             self.augment_fn = self.add_reference	
         else:	
@@ -149,8 +149,10 @@ class TN1(nn.Module):
     def add_reference(self, x, new_ref, new_ref_errors, t, g, mask):
         batch_size, n_tracks, _ = x.shape
         x_prime = self.extrapolator(x, jax.lax.stop_gradient(new_ref))
-        x_prime = x_prime * mask
+        x_prime = x_prime * mask    
         if self.points_as_features:
+            x = jnp.concatenate([x, jnp.zeros(shape=(batch_size, n_tracks, 3))], axis=2)
+            x_prime = x_prime * mask
             if new_ref_errors.ndim == 3:
                 new_ref_errors = jax.lax.map(jnp.diag, new_ref_errors)
             x_points = jnp.repeat(new_ref, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
@@ -159,20 +161,24 @@ class TN1(nn.Module):
             # x_errors = jax.lax.stop_gradient(x_errors)
             x_prime = jnp.concatenate([x_prime, x_points], axis=2)
             if self.errors_as_features:
+                x = jnp.concatenate([x, jnp.zeros(shape=(batch_size, n_tracks, 3))], axis=2)
                 x_prime = jnp.concatenate([x_prime, x_errors], axis=2)
-                
+
+
         x_prime = self.scale_fn(x_prime)
 
         t_prime, g_prime = self.preprocessor(x_prime, mask)
         
         # WORK IN PROGRESS 13/set
-        # x_all = jnp.concatenate([x, x_prime], axis=1)
-        # g_all = jnp.concatenate([g, g_prime], axis=1)
-        # mask_all = jnp.concatenate([mask, mask], axis=1)
+        x_all = jnp.concatenate([x, x_prime], axis=1)
+        g_all = jnp.concatenate([g, g_prime], axis=1)
+        mask_all = jnp.concatenate([mask, mask], axis=1)
+        g_all = self.rpgnn(self.encoder, x_all, g_all, mask_all)
+        # g_all = g_all[:, :n_tracks, :]
         # _, g_all = self.processor(x_all, mask_all, embed=g_all)	
-        # g_all = jnp.concatenate([g_all[:, :n_tracks, :], g_all[:, n_tracks:, :]], axis=2)	
-        # g_all = self.augm_lin(g_all)
-        # repr_track = jnp.concatenate([g, g_all], axis=2)
+        g_all = jnp.concatenate([g_all[:, :n_tracks, :], g_all[:, n_tracks:, :]], axis=2)	
+        g_all = self.augm_lin(g_all)
+        repr_track = jnp.concatenate([g, g_all], axis=2)
 
         repr_track = jnp.concatenate([g, g_prime], axis=2)
 
@@ -194,7 +200,7 @@ class TN1(nn.Module):
 
         t, g = self.preprocessor(x_scaled, mask)
             
-        if not fix:
+        if False and not fix:
             out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
         else:
             out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
