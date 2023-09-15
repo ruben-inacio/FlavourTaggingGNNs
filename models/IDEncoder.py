@@ -106,8 +106,29 @@ class IDEncoder(nn.Module):
         g_rho = encoder(t_rho, mask=mask)
         g_deltar = encoder(t_deltar, mask=mask)
         return 0.2 * (g_eye + g_rev + g_pt + g_rho + g_deltar)
-        
+
+    def encode_augmented(self, encoder, x, t, mask):
+        _, n_tracks, _ = x.shape
+        n_tracks = n_tracks // 2
+        mask_ = mask[:, :n_tracks, :]
+
+        ids = jnp.stack([jnp.arange(0, n_tracks)] * x.shape[0], axis=0)
+        ids_rev = jnp.stack([jnp.arange(0, n_tracks)][::-1] * x.shape[0], axis=0)
+
+        t_eye_1 = self.get_encodings(t[:, :n_tracks, :], ids) * mask_
+        t_eye_2 = self.get_encodings(t[:, n_tracks:, :], ids) * mask_
     
+        t_eye_rev_1 = self.get_encodings(t[:, :n_tracks, :], ids_rev) * mask_
+        t_eye_rev_2 = self.get_encodings(t[:, n_tracks:, :], ids_rev) * mask_
+
+        t_eye = jnp.concatenate([t_eye_1, t_eye_2], axis = 1)
+        t_eye_rev = jnp.concatenate([t_eye_rev_1, t_eye_rev_2], axis = 1)
+
+        g_eye = encoder(t_eye, mask=mask)
+        g_rev = encoder(t_eye_rev, mask=mask)
+
+        return 0.5 * (g_eye + g_rev)
+
     def __call__(self, encoder, x, t, mask=None):
         return self.pooling_fn(encoder, x, t, mask)
 
