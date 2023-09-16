@@ -18,7 +18,7 @@ class PreProcessor(nn.Module):
     num_graphs: int 
 
     def setup(self):
-        last_dim = self.hidden_channels - 15 * self.use_encodings * self.num_graphs
+        last_dim = self.hidden_channels - 15 * self.use_encodings * (self.num_graphs == 1)
 
         self.track_init = nn.Sequential([
             nn.Dense(features=self.hidden_channels, param_dtype=jnp.float64),
@@ -33,7 +33,7 @@ class PreProcessor(nn.Module):
         # self.norm = nn.RMSNorm()
 
         self.encoder = Encoder(
-            hidden_channels=self.hidden_channels, 
+            hidden_channels=self.hidden_channels + (15 * self.num_graphs if self.num_graphs != 1 else 0), 
             heads=self.heads, 
             layers=self.layers, 
             architecture=self.architecture

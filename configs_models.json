@@ -10,7 +10,7 @@
         "errors_as_features": false,
         "scale": false,
         "use_encodings": true,
-        "encoding_strategy": "augmented"
+        "encoding_strategy": "simple_eye"
     },
     "predictor": {
         "hidden_channels": 32,

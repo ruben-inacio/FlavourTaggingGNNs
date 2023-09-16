@@ -40,8 +40,8 @@ class TN1(nn.Module):
             heads = self.heads,
             architecture="post",
             use_encodings=self.use_encodings,
-            encoding_strategy="simple_eye", #self.encoding_strategy,
-            num_graphs=1
+            encoding_strategy=self.encoding_strategy,
+            num_graphs=2
         )
         # self.preprocessor2 = PreProcessor(
         #     hidden_channels = self.hidden_channels,
@@ -167,16 +167,16 @@ class TN1(nn.Module):
 
         x_prime = self.scale_fn(x_prime)
 
-        t_prime, g_prime = self.preprocessor(x_prime, mask)
+        # t_prime, g_prime = self.preprocessor(x_prime, mask)
         
         # WORK IN PROGRESS 13/set
         # """
         x_all = jnp.concatenate([x, x_prime], axis=1)
-        t_all = jnp.concatenate([t, t_prime], axis=1)
-        g_all = jnp.concatenate([g, g_prime], axis=1)
+        # t_all = jnp.concatenate([t, t_prime], axis=1)
+        # g_all = jnp.concatenate([g, g_prime], axis=1)
         mask_all = jnp.concatenate([mask, mask], axis=1)
 
-        g_all = self.rpgnn(self.encoder, x_all, t_all, mask_all)
+        t_all, g_all = self.preprocessor(x_all, mask_all)
         repr_track = jnp.concatenate([g_all[:, :n_tracks, :], g_all[:, n_tracks:, :]], axis=2)
         # repr_track = jnp.concatenate([g, g_all], axis=2)
         # """
@@ -198,7 +198,7 @@ class TN1(nn.Module):
 
         x_scaled = self.scale_fn(x_)
 
-        t, g = self.preprocessor(x_scaled, mask)
+        # t, g = self.preprocessor(x_scaled, mask)
             
         if not fix:
             out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
@@ -207,7 +207,7 @@ class TN1(nn.Module):
         
         _, _, _, out_mean, out_var, out_chi = out_preds
         
-        repr_track = self.augment_fn(x, out_mean, out_var, t, g, mask)
+        repr_track = self.augment_fn(x, out_mean, out_var, x, x, mask)
         # 
         # key = jax.random.PRNGKey(datetime.datetime.now().second)
         # out_var_diag = jax.lax.map(jnp.diag, out_var)
