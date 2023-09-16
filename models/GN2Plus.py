@@ -82,7 +82,7 @@ class TN1(nn.Module):
 
         if self.strategy_prediction in ("fit", "regression"):
             self.apply_strategy_prediction_fn = Predictor(
-                hidden_channels=         64, #self.hidden_channels, #64,
+                hidden_channels=         self.hidden_channels, #64,
                 layers=                  self.layers,  #3,
                 heads=                   self.heads,  #2,
                 strategy_sampling=       None,
@@ -170,20 +170,16 @@ class TN1(nn.Module):
         t_prime, g_prime = self.preprocessor(x_prime, mask)
         
         # WORK IN PROGRESS 13/set
+        # """
         x_all = jnp.concatenate([x, x_prime], axis=1)
         t_all = jnp.concatenate([t, t_prime], axis=1)
         g_all = jnp.concatenate([g, g_prime], axis=1)
         mask_all = jnp.concatenate([mask, mask], axis=1)
 
         g_all = self.rpgnn(self.encoder, x_all, t_all, mask_all)
-        # g_all = self.rpgnn(self.encoder, x_all, g_all, mask_all)
-
-        # g_all = g_all[:, :n_tracks, :]
-        # _, g_all = self.processor(x_all, mask_all, embed=g_all)	
-        # g_all = self.augm_lin(g_all)
-        repr_track = jnp.concatenate([g_all[:, :n_tracks, :], g_all[:, n_tracks:, :]], axis=2)	
+        repr_track = jnp.concatenate([g_all[:, :n_tracks, :], g_all[:, n_tracks:, :]], axis=2)
         # repr_track = jnp.concatenate([g, g_all], axis=2)
-
+        # """
         # repr_track = jnp.concatenate([g, g_prime], axis=2)
     
         return repr_track
