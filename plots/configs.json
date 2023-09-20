@@ -1,10 +1,10 @@
 {
-    "results_dir": "../../comparisons/novograd_bad",
+    "results_dir": "../../comparisons/3perm",
     "models": [
-       "../../final_results/gn2_adamw001_batch250", "../../final_results/gn2_novograd001_batch250", "../../final_results/gn2ndive_novograd001_batch250"
+      "../../final_results/gn2_encodings_simple_eye_adamw001", "../../models/test3permutations"
     ],
     "labels_models": [
-        "GN2 adamw", "GN2 novograd", "GN2+ novograd"
+       "GN2 eye", "GN2 eye pt"
     ],
     "labels_graph": [
         "b", "c", "u"

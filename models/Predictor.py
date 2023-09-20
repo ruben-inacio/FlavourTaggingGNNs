@@ -24,6 +24,7 @@ class Predictor(nn.Module):
     method: str
     use_encodings: bool
     encoding_strategy: str
+    seed: int
 
     def setup(self):
         self.preprocessor = PreProcessor(
@@ -33,7 +34,8 @@ class Predictor(nn.Module):
             architecture="post",
             use_encodings=self.use_encodings,
             encoding_strategy=self.encoding_strategy,
-            num_graphs=1
+            num_graphs=1,
+            seed = self.seed
         )
 
         if self.strategy_weights == "compute":

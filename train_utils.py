@@ -15,6 +15,7 @@ from flax.training import train_state, checkpoints
 from flax.core import freeze, unfreeze
 import pickle
 import copy
+import numpy as np
 
 if "lipml" in host:
     DEFAULT_DIR = "/lstore/titan/miochoa/TrackGeometry2023/RachelDatasets_Jun2023/all_flavors/all_flavors" 
@@ -69,6 +70,8 @@ def get_model(model_type, save_dir=None, settings=None):
     if settings is None:
         with open("configs_models.json", "r") as f:
             settings = json.load(f)[model_type]
+    # Set random seed
+    settings['seed'] = np.random.randint(0, 42)
     if model_type == "predictor":
         model = Predictor(**settings)
     elif model_type == "complete":

@@ -4,9 +4,11 @@ sys.path.append("../utils/")
 from flax import linen as nn  
 import jax.numpy as jnp
 import jax
+import datetime
 
 from utils.layers import Encoder 
 from models.IDEncoder import IDEncoder
+
 
 class PreProcessor(nn.Module):
     hidden_channels: int
@@ -16,6 +18,7 @@ class PreProcessor(nn.Module):
     use_encodings: bool
     encoding_strategy: str
     num_graphs: int 
+    seed: int 
 
     def setup(self):
         last_dim = self.hidden_channels - 15 * self.use_encodings * (self.num_graphs == 1)
@@ -39,18 +42,18 @@ class PreProcessor(nn.Module):
             architecture=self.architecture
         )
 
-        self.rpgnn = IDEncoder(pooling_strategy=self.encoding_strategy)
+        self.rpgnn = IDEncoder(pooling_strategy=self.encoding_strategy, seed=self.seed) #, seed=datetime.datetime.now().second)
 
-    # FIXME remove last arg, shouldn't be needed with the IDEncoder file
-    def __call__(self, x, mask=None, embed=None):
+    def __call__(self, x, mask=None):
         if mask is None:
             mask = jnp.ones((x.shape[0], 1))
 
         x = x * mask
-        if embed is None:
-            t = self.track_init(x)
-        else: 
-            t = embed
+        # TODO (try same mlp for both graphs in augmentation)
+        # maybe use num graphs and fori_loop ?
+
+            
+        t = self.track_init(x)
         t = t * mask
 
         if self.use_encodings:

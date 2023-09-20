@@ -26,6 +26,8 @@ class TN1(nn.Module):
     scale:               bool
     use_encodings:       bool
     encoding_strategy:   str
+    propagate_independently: bool
+    seed: int
 
     def debug_print(*args):
         for arg in args:
@@ -41,14 +43,9 @@ class TN1(nn.Module):
             architecture="post",
             use_encodings=self.use_encodings,
             encoding_strategy=self.encoding_strategy,
-            num_graphs=2
+            num_graphs=1,
+            seed=self.seed
         )
-        # self.preprocessor2 = PreProcessor(
-        #     hidden_channels = self.hidden_channels,
-        #     layers = self.layers,
-        #     heads = self.heads,
-        #     architecture="post"
-        # )
         
         self.gate_nn = nn.Dense(features=1, param_dtype=jnp.float64)
         self.pool = GlobalAttention(gate_nn=self.gate_nn)
@@ -56,18 +53,9 @@ class TN1(nn.Module):
         self.extraplator = None
         if self.augment:
             self.extrapolator = extrapolation
-            self.encoder = Encoder(
-                hidden_channels=self.hidden_channels, #+15, 
-                heads=self.heads, 
-                layers=self.layers, 
-                architecture="post"
-            )
-            self.rpgnn = IDEncoder(pooling_strategy=self.encoding_strategy)
-
-            # self.augm_lin = nn.Dense(features=self.hidden_channels)	
-            self.augment_fn = self.add_reference	
-        else:	
-            self.augment_fn = lambda *args: args[4]
+            self.propagate_fn = self.add_reference
+        else:
+            self.propagate_fn = self.process_single_jet
 
         if self.scale:  # TODO FIXME out of date
             if self.points_as_features:
@@ -91,7 +79,8 @@ class TN1(nn.Module):
                 use_encodings =          False, #self.use_encodings,
                 activation =             "softmax",
                 method=                  self.strategy_prediction,
-                encoding_strategy="simple_eye"
+                encoding_strategy=       "simple_eye",
+                seed= self.seed
             )
         elif self.strategy_prediction is not None:
             self.apply_strategy_prediction_fn = eval("self.apply_prediction_" + self.strategy_prediction)
@@ -146,7 +135,7 @@ class TN1(nn.Module):
             log_errors = jnp.zeros([x.shape[0], 3]) 
             return None, None, None, points, log_errors, None
     
-    def add_reference(self, x, new_ref, new_ref_errors, t, g, mask):
+    def add_reference(self, x, mask, new_ref, new_ref_errors):
         batch_size, n_tracks, _ = x.shape
         x_prime = self.extrapolator(x, jax.lax.stop_gradient(new_ref))
         x_prime = x_prime * mask    
@@ -164,28 +153,24 @@ class TN1(nn.Module):
                 x = jnp.concatenate([x, jnp.zeros(shape=(batch_size, n_tracks, 3))], axis=2)
                 x_prime = jnp.concatenate([x_prime, x_errors], axis=2)
 
-
+        x = self.scale_fn(x)
         x_prime = self.scale_fn(x_prime)
 
-        # t_prime, g_prime = self.preprocessor(x_prime, mask)
-        
-        # WORK IN PROGRESS 13/set
-        # """
-        x_all = jnp.concatenate([x, x_prime], axis=1)
-        # t_all = jnp.concatenate([t, t_prime], axis=1)
-        # g_all = jnp.concatenate([g, g_prime], axis=1)
-        mask_all = jnp.concatenate([mask, mask], axis=1)
+        if self.propagate_independently:
+            t, g = self.preprocessor(x, mask)
+            t_prime, g_prime = self.preprocessor(x_prime, mask)
+            repr_track = jnp.concatenate([g, g_prime], axis=2)
+            
+        else:
+            x_all = jnp.concatenate([x, x_prime], axis=1)
+            mask_all = jnp.concatenate([mask, mask], axis=1)
 
-        t_all, g_all = self.preprocessor(x_all, mask_all)
-        repr_track = jnp.concatenate([g_all[:, :n_tracks, :], g_all[:, n_tracks:, :]], axis=2)
-        # repr_track = jnp.concatenate([g, g_all], axis=2)
-        # """
-        # repr_track = jnp.concatenate([g, g_prime], axis=2)
+            t_all, g_all = self.preprocessor(x_all, mask_all)
+            repr_track = jnp.concatenate([g_all[:, :n_tracks, :], g_all[:, n_tracks:, :]], axis=2)
     
         return repr_track
-
-    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta, fix=False):
-        assert(x.ndim == 3)  # n_jets, n_tracks, n_features
+        
+    def process_single_jet(self, x, mask, *args):
         batch_size, max_tracks, _ = x.shape
 
         x_ = x * mask
@@ -197,8 +182,13 @@ class TN1(nn.Module):
 
 
         x_scaled = self.scale_fn(x_)
+        t, g = self.preprocessor(x_scaled, mask)
+        return g
+        
 
-        # t, g = self.preprocessor(x_scaled, mask)
+    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta, fix=False):
+        assert(x.ndim == 3)  # n_jets, n_tracks, n_features
+        batch_size, max_tracks, _ = x.shape
             
         if not fix:
             out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
@@ -207,13 +197,7 @@ class TN1(nn.Module):
         
         _, _, _, out_mean, out_var, out_chi = out_preds
         
-        repr_track = self.augment_fn(x, out_mean, out_var, x, x, mask)
-        # 
-        # key = jax.random.PRNGKey(datetime.datetime.now().second)
-        # out_var_diag = jax.lax.map(jnp.diag, out_var)
-        # out_samples = jax.lax.stop_gradient(jax.random.uniform(key, shape=out_mean.shape, minval=out_mean-out_var_diag, maxval=out_mean+out_var_diag))
-        # repr_track = self.augment_fn(x, out_samples, out_var, t, g, mask, thresholds=thresholds)
-        # 
+        repr_track = self.propagate_fn(x, mask, out_mean, out_var)
 
         # Compute jet-level representation
         repr_jet, _ = self.pool(repr_track, mask)
@@ -226,7 +210,7 @@ class TN1(nn.Module):
         # Compute edge-lavel representation
         a1 = jnp.repeat(t, max_tracks,axis=1)
         a2 = jnp.repeat(t, max_tracks,axis=0).reshape(batch_size , max_tracks**2, -1)
-        a3 = jnp.repeat(repr_jet,max_tracks**2,axis=0).reshape(batch_size,max_tracks**2,-1)
+        a3 = jnp.repeat(repr_jet, max_tracks**2, axis=0).reshape(batch_size, max_tracks**2, -1)
         repr_vtx  = jnp.concatenate((a1,a2,a3), axis=2)
 
         # Obtain output probabilities 
