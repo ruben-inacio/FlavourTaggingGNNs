@@ -24,7 +24,6 @@ class TN1(nn.Module):
     points_as_features:  bool
     errors_as_features:  bool
     scale:               bool
-    use_encodings:       bool
     encoding_strategy:   str
     propagate_independently: bool
     seed: int
@@ -41,7 +40,6 @@ class TN1(nn.Module):
             layers = self.layers,
             heads = self.heads,
             architecture="post",
-            use_encodings=self.use_encodings,
             encoding_strategy=self.encoding_strategy,
             num_graphs=1,
             seed=self.seed
@@ -70,13 +68,12 @@ class TN1(nn.Module):
 
         if self.strategy_prediction in ("fit", "regression"):
             self.apply_strategy_prediction_fn = Predictor(
-                hidden_channels=         self.hidden_channels, #64,
-                layers=                  self.layers,  #3,
-                heads=                   self.heads,  #2,
+                hidden_channels=         32, #64,
+                layers=                  1,  #3,
+                heads=                   2,  #2,
                 strategy_sampling=       None,
-                strategy_weights=        self.strategy_weights,
+                strategy_weights=        "compute",
                 use_ghost_track=         False,
-                use_encodings =          False, #self.use_encodings,
                 activation =             "softmax",
                 method=                  self.strategy_prediction,
                 encoding_strategy=       "simple_eye",

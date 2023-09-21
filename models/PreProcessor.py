@@ -15,13 +15,12 @@ class PreProcessor(nn.Module):
     heads: int
     layers: int
     architecture: str
-    use_encodings: bool
     encoding_strategy: str
     num_graphs: int 
     seed: int 
 
     def setup(self):
-        last_dim = self.hidden_channels - 15 * self.use_encodings * (self.num_graphs == 1)
+        last_dim = self.hidden_channels - 15 * (self.encoding_strategy != None) * (self.num_graphs == 1)
 
         self.track_init = nn.Sequential([
             nn.Dense(features=self.hidden_channels, param_dtype=jnp.float64),
@@ -42,7 +41,9 @@ class PreProcessor(nn.Module):
             architecture=self.architecture
         )
 
-        self.rpgnn = IDEncoder(pooling_strategy=self.encoding_strategy, seed=self.seed) #, seed=datetime.datetime.now().second)
+
+        self.rpgnn = IDEncoder(pooling_strategy=self.encoding_strategy, seed=self.seed)
+
 
     def __call__(self, x, mask=None):
         if mask is None:
@@ -56,11 +57,7 @@ class PreProcessor(nn.Module):
         t = self.track_init(x)
         t = t * mask
 
-        if self.use_encodings:
-            g = self.rpgnn(self.encoder, x, t, mask)
-        else:
-            g = self.encoder(t, mask=mask)
-        
+        g = self.rpgnn(self.encoder, x, t, mask)
         g = g * mask
 
         return t, g

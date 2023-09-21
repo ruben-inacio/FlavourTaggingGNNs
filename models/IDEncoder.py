@@ -14,7 +14,11 @@ class IDEncoder(nn.Module):
     seed: int = 42
 
     def setup(self):
-        self.pooling_fn = eval("self.encode_" + self.pooling_strategy)
+        if self.pooling_strategy is None:
+            self.pooling_fn = lambda encoder, x, t, mask: encoder(t, mask=mask)
+        else:
+            self.pooling_fn = eval("self.encode_" + self.pooling_strategy)
+        
         if self.pooling_strategy == "simple_random":
             #  if not hasattr(self, "seed"):
             #     self.seed = np.random.randint(0, high=42)
@@ -113,7 +117,6 @@ class IDEncoder(nn.Module):
         g_inv = encoder(t_rp_inv, mask=mask)
 
         return (g + g_2 + g_inv) / 3
-    
     
     def encode_best(self, encoder, x, t, mask):
         ids_eye = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)

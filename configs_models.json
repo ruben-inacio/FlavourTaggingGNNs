@@ -6,11 +6,10 @@
         "augment": false,
         "strategy_prediction": null,
         "strategy_weights": "compute",
-        "points_as_features": false,
+        "points_as_features": true,
         "errors_as_features": false,
         "scale": false,
-        "use_encodings": true,
-        "encoding_strategy": "simple_random",
+        "encoding_strategy": "augmented",
         "propagate_independently": false
     },
     "predictor": {
@@ -21,7 +20,7 @@
         "strategy_sampling": null,
         "activation": "softmax",
         "use_ghost_track": false,
-        "use_encodings": false,
+        "encoding_strategy": null,
         "method": "fit"
     }
 }

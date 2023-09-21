@@ -22,7 +22,6 @@ class Predictor(nn.Module):
     use_ghost_track: bool
     activation: str
     method: str
-    use_encodings: bool
     encoding_strategy: str
     seed: int
 
@@ -32,7 +31,6 @@ class Predictor(nn.Module):
             layers = self.layers,
             heads = self.heads,
             architecture="post",
-            use_encodings=self.use_encodings,
             encoding_strategy=self.encoding_strategy,
             num_graphs=1,
             seed = self.seed
