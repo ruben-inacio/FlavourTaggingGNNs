@@ -38,8 +38,9 @@ class EncoderLayer(nn.Module):
         self.lin2 = nn.Dense(features=self.hidden_channels, param_dtype=jnp.float64)
         self.fwd_fn = eval("self.fwd_" + self.architecture)
     
-    def fwd_post(self, x, y):
-        n = self.attn(x, y)
+    def fwd_post(self, x, mask):
+        # n = self.attn(x, y, mask=mask)
+        n = self.attn(x, x, mask=mask)
         x = x + n
         x = self.norm1(x)
         n = self.lin1(x)
@@ -63,11 +64,18 @@ class EncoderLayer(nn.Module):
     def fwd_postb2t(self, x):
         pass
 
-    def __call__(self, x, y, mask=None):
-        if mask is not None:
-            x = x * mask
-            y = y * mask
-        x = self.fwd_fn(x, y)
+    def __call__(self, x, mask):
+        # mask = mask.at[:, -1, :].set(0)
+
+        mask_t = jnp.transpose(mask, (0, 2, 1))
+        mask_attn = mask @ mask_t
+        mask_attn = mask_attn.astype(jnp.bool_)
+
+        mask_attn = jnp.stack([mask_attn] * self.heads, axis=1)
+
+        x = x * mask
+
+        x = self.fwd_fn(x, mask=mask_attn)
         return x
 
 
@@ -88,7 +96,8 @@ class Encoder(nn.Module):
 
     def __call__(self, g, mask=None):
         for i in range(self.layers):
-            g = getattr(self, f"enc_layer_{i}")(g, g, mask=mask)
+            g = getattr(self, f"enc_layer_{i}")(g, mask=mask)
+            # g = getattr(self, f"enc_layer_{i}")(g, g, mask=mask)
 
         if mask is not None:
             g = g * mask

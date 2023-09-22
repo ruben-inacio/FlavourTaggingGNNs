@@ -20,7 +20,6 @@ class TN1(nn.Module):
     heads:               int
     augment:             bool
     strategy_prediction: str
-    strategy_weights:    str
     points_as_features:  bool
     errors_as_features:  bool
     scale:               bool
@@ -167,7 +166,7 @@ class TN1(nn.Module):
     
         return repr_track
         
-    def process_single_jet(self, x, mask, *args):
+    def process_single_jet(self, x, mask, offset):
         batch_size, max_tracks, _ = x.shape
 
         x_ = x * mask
@@ -179,23 +178,25 @@ class TN1(nn.Module):
 
 
         x_scaled = self.scale_fn(x_)
-        t, g = self.preprocessor(x_scaled, mask)
+
+        t, g = self.preprocessor(x_scaled, mask, offset=offset)
         return g
         
 
-    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta, fix=False):
+    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta, offset=None):
         assert(x.ndim == 3)  # n_jets, n_tracks, n_features
         batch_size, max_tracks, _ = x.shape
-            
-        if not fix:
-            out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
-        else:
-            out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
+
+        # if not fix:
+        out_preds = self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta)
+        # else:
+        #     out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
         
         _, _, _, out_mean, out_var, out_chi = out_preds
-        
-        repr_track = self.propagate_fn(x, mask, out_mean, out_var)
-
+        if out_mean is not None:
+            repr_track = self.propagate_fn(x, mask, out_mean, out_var)
+        else:
+            repr_track = self.propagate_fn(x, mask, offset)
         # Compute jet-level representation
         repr_jet, _ = self.pool(repr_track, mask)
 

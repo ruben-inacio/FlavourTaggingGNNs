@@ -5,11 +5,10 @@
         "heads": 2,
         "augment": false,
         "strategy_prediction": null,
-        "strategy_weights": "compute",
-        "points_as_features": true,
+        "points_as_features": false,
         "errors_as_features": false,
         "scale": false,
-        "encoding_strategy": "augmented",
+        "encoding_strategy": "simple_eye",
         "propagate_independently": false
     },
     "predictor": {

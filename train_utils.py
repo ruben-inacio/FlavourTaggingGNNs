@@ -43,7 +43,7 @@ def filter_jets(x, y):
     return x, y
 
 
-def get_batch(x, y):
+def get_batch(x, y, epoch=None):
     # x, y = filter_jets(x, y)
 
     batch = {}
@@ -63,6 +63,8 @@ def get_batch(x, y):
     batch['trk_vtx'] = x[:, :, 16:19]
     batch['jet_vtx'] = x[:, 0, 19:22]
     batch['y'] = y  
+    batch['epoch'] = epoch
+
     return batch
 
 
@@ -89,7 +91,7 @@ def get_model(model_type, save_dir=None, settings=None):
 def get_init_input():
     x = jnp.ones([N_JETS, N_TRACKS, 51]) * 2.0
     y = jnp.ones([N_JETS, N_TRACKS, 25])
-    batch = get_batch(x, y)
+    batch = get_batch(x, y, 0)
     mask, mask_edges = mask_tracks(batch['x'], jnp.ones(x.shape[0]) * 15)
 
     return batch, mask
@@ -114,7 +116,6 @@ def mask_predictor(params):
 def create_train_state(rng, learning_rate, model=None, params=None, optimiser='adam'):
     if params is None:  # Initialise the model
         batch, mask = get_init_input()
-        
         params = model.init(rng, 
             batch['x'], 
             mask, 
@@ -122,7 +123,8 @@ def create_train_state(rng, learning_rate, model=None, params=None, optimiser='a
             batch['trk_vtx'],
             batch['n_tracks'],
             batch['jet_phi'],
-            batch['jet_theta']
+            batch['jet_theta'],
+            batch['epoch']
         )['params']
         
         if "Predictor" not in str(type(model)):

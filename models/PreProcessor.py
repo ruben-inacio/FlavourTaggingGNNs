@@ -45,7 +45,7 @@ class PreProcessor(nn.Module):
         self.rpgnn = IDEncoder(pooling_strategy=self.encoding_strategy, seed=self.seed)
 
 
-    def __call__(self, x, mask=None):
+    def __call__(self, x, mask=None, offset=None):
         if mask is None:
             mask = jnp.ones((x.shape[0], 1))
 
@@ -57,7 +57,7 @@ class PreProcessor(nn.Module):
         t = self.track_init(x)
         t = t * mask
 
-        g = self.rpgnn(self.encoder, x, t, mask)
+        g = self.rpgnn(self.encoder, x, t, mask, offset=offset)
         g = g * mask
 
         return t, g
