@@ -68,12 +68,12 @@ def get_batch(x, y, epoch=None):
     return batch
 
 
-def get_model(model_type, save_dir=None, settings=None):
+def get_model(model_type, save_dir=None, settings=None, instance=None):
     if settings is None:
         with open("configs_models.json", "r") as f:
             settings = json.load(f)[model_type]
     # Set random seed
-    settings['seed'] = np.random.randint(0, 42)
+    settings['seed'] = np.random.randint(0, 50)
     if model_type == "predictor":
         model = Predictor(**settings)
     elif model_type == "complete":
@@ -82,9 +82,14 @@ def get_model(model_type, save_dir=None, settings=None):
     #     model = TN1SimpleEnsemble(hidden_channels=32, layers=3, heads=2)
     # model = NDIVE() # 
     if save_dir is not None:
-        with open(save_dir + "/config.json", "w") as f:
-            json_object = json.dumps(settings, indent=4)
-            f.write(json_object)
+        if instance is None:
+            with open(save_dir + "/config.json", "w") as f:
+                json_object = json.dumps(settings, indent=4)
+                f.write(json_object)
+        else:
+            with open(save_dir + f"/config_{instance}.json", "w") as f:
+                json_object = json.dumps(settings, indent=4)
+                f.write(json_object)
     return model
 
 
@@ -148,11 +153,17 @@ def create_train_state(rng, learning_rate, model=None, params=None, optimiser='a
         params = unfreeze(params)
         mask_pred = mask_predictor(copy.deepcopy(unfreeze(params)))
         mask_others = jax.tree_map(lambda x: not x, mask_pred)
-
+        # if learning_rate > 1e-4:
+        #     tx = optax.chain(
+        #         optax.masked(optax.novograd(learning_rate=1e-4), mask_pred),
+        #         optax.masked(optax.adamw(learning_rate=learning_rate), mask_others)
+        #     )
+        # else:
         tx = optax.chain(
             optax.masked(optax.novograd(learning_rate=learning_rate), mask_pred),
             optax.masked(optax.adamw(learning_rate=learning_rate), mask_others)
         )
+
 
     # tx = optax.chain(
     #     optax.adam(learning_rate=learning_rate),

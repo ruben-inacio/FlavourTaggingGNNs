@@ -498,9 +498,8 @@ if __name__ == "__main__":
     num_instances = sum([fn.startswith('loss_history') for fn in os.listdir(save_dir)])
     print("Number of instances already trained:", num_instances)
     
-    model = get_model(opt.model, save_dir=save_dir)
-
     for instance_id in range(num_instances, opt.ensemble_size):
+        model = get_model(opt.model, save_dir=save_dir, instance=instance_id)
         lr = opt.lr
         print("Instance number:", instance_id)
         rng, state = init_model(rng, model, optimiser, lr=opt.lr)

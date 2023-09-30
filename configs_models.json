@@ -4,17 +4,17 @@
         "layers": 3,
         "heads": 2,
         "augment": false,
-        "strategy_prediction": null,
+        "strategy_prediction": "fit",
         "points_as_features": false,
         "errors_as_features": false,
         "scale": false,
-        "encoding_strategy": "simple_eye",
-        "propagate_independently": false
+        "encoding_strategy": null,
+        "propagate_independently": true
     },
     "predictor": {
         "hidden_channels": 32,
-        "layers": 3,
-        "heads": 2,
+        "layers": 1,
+        "heads": 1,
         "strategy_weights": "compute",
         "strategy_sampling": null,
         "activation": "softmax",

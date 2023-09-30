@@ -47,6 +47,8 @@ class Predictor(nn.Module):
             self.activation_fn = nn.sigmoid
         elif self.activation == "softmax":
             self.activation_fn = lambda x: nn.activation.softmax(x, axis=1)
+        elif self.activation is None:
+            self.activation_fn = lambda x: x
 
         self.apply_strategy_weights_fn = eval("self.apply_strategy_weights_" + self.strategy_weights)
         if self.strategy_sampling is not None:
@@ -132,7 +134,7 @@ class Predictor(nn.Module):
         
         return x, mask
 
-    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta, **kwargs):
+    def __call__(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta, *args, **kwargs):
         num_jets, max_num_tracks, _ = x.shape
 
         if self.use_ghost_track:

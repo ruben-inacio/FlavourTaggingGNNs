@@ -184,6 +184,26 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
     return pred_mu, pred_sigma, true, true_flavours, jet_pts, jet_trks   
 
 
+def get_model_with_settings(save_dir, instance=None):
+    if instance is None:
+        with open(f"{save_dir}/config.json", "r") as f:
+            settings = json.load(f)
+    else:
+        try:
+            with open(f"{save_dir}/config_{instance}.json", "r") as f:
+                settings = json.load(f)
+        except Exception:
+            with open(f"{save_dir}/config.json", "r") as f:
+                settings = json.load(f)
+    if "seed" in settings:
+        print("seed =", settings['seed'])
+    try:
+        model = TN1(**settings)
+    except Exception:
+        model = Predictor(**settings)
+    return model
+    
+
 if __name__ == '__main__':
     opt = parse_args()
 
@@ -200,16 +220,8 @@ if __name__ == '__main__':
     else:
         print("Retrieving from", save_dir)
 
-    with open(f"{save_dir}/config.json", "r") as f:
-        settings = json.load(f)
-
-    try:
-        model = TN1(**settings)
-    except Exception:
-        model = Predictor(**settings)
-
     total = len([filename for filename in os.listdir(save_dir) if filename.startswith("params")])
-    print("model", type(model), "num instances", total)
+    print("num instances", total)
     start = 0
     for i in range(total):
         results_exist = sum(x.endswith(f'{i}.npy') for x in os.listdir(save_dir)) > 0
@@ -218,8 +230,9 @@ if __name__ == '__main__':
         else:
             break
             
-
+    print('start', start)
     for ensemble_id in range(start, total):
+        model = get_model_with_settings(save_dir, ensemble_id)
         with open(f"{save_dir}/params_{ensemble_id}.pickle", 'rb') as fp:
             params = pickle.load(fp)
 

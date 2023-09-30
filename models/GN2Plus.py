@@ -67,15 +67,15 @@ class TN1(nn.Module):
 
         if self.strategy_prediction in ("fit", "regression"):
             self.apply_strategy_prediction_fn = Predictor(
-                hidden_channels=         32, #64,
-                layers=                  1,  #3,
-                heads=                   2,  #2,
+                hidden_channels=         32,
+                layers=                  1,
+                heads=                   1,
                 strategy_sampling=       None,
-                strategy_weights=        "compute",
+                strategy_weights=        "compute",  # "perfect",
                 use_ghost_track=         False,
-                activation =             "softmax",
+                activation =             "softmax",  # None,
                 method=                  self.strategy_prediction,
-                encoding_strategy=       "simple_eye",
+                encoding_strategy=       None,
                 seed= self.seed
             )
         elif self.strategy_prediction is not None:
@@ -118,7 +118,7 @@ class TN1(nn.Module):
         self.softmax = lambda x: nn.activation.softmax(x, axis=1)
     
     def apply_prediction_none(self, x, mask, *args):
-            rng = jax.random.PRNGKey(0)
+            rng = jax.random.PRNGKey(datetime.datetime.now().second)
             rng, init_rng = jax.random.split(rng)
             r1 = -5
             points = jax.random.uniform(init_rng, shape=[x.shape[0], 3], minval=r1, maxval=-r1)
@@ -193,7 +193,7 @@ class TN1(nn.Module):
         #     out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
         
         _, _, _, out_mean, out_var, out_chi = out_preds
-        if out_mean is not None:
+        if out_mean is not None and self.augment:
             repr_track = self.propagate_fn(x, mask, out_mean, out_var)
         else:
             repr_track = self.propagate_fn(x, mask, offset)

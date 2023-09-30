@@ -57,7 +57,8 @@ class PreProcessor(nn.Module):
         t = self.track_init(x)
         t = t * mask
 
-        g = self.rpgnn(self.encoder, x, t, mask, offset=offset)
+        g = self.rpgnn(self.encoder, x, t, mask, offset)
+        # g = self.rpgnn(self.encoder, x, t, mask, offset=offset)
         g = g * mask
 
         return t, g

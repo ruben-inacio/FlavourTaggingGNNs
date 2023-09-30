@@ -1,10 +1,13 @@
 {
-    "results_dir": "../../comparisons/3perm",
+    "results_dir": "../../comparisons/section5_ndive",
+    "models_2": [
+         "../../final_results_old/gn2_adamw001_batch250", "../../section5_enc/gn2_simple_eye", "../../section5_enc/gn2_random_fixed"
+    ],
     "models": [
-      "../../final_results/gn2_encodings_simple_eye_adamw001", "../../models/test3permutations"
+        "../../section5_ndive/ndive", "../../section5_ndive/ndive_simple_eye"
     ],
     "labels_models": [
-       "GN2 eye", "GN2 eye pt"
+       "ndive", "ndive enc"
     ],
     "labels_graph": [
         "b", "c", "u"
