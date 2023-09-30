@@ -57,9 +57,21 @@ class PreProcessor(nn.Module):
         t = self.track_init(x)
         t = t * mask
 
+        # current_date = 42 #datetime.datetime.now() doesnt work (falls in the case the seeds differ between train and test)
+        # key = jax.random.PRNGKey(current_date)
+        # idx = jax.random.permutation(key, x.shape[1])
+        # return_idx = jnp.argsort(idx)
+        # x = x[:,idx]
+        # t = t[:,idx]
+        # mask = mask[:,idx]
+        
         g = self.rpgnn(self.encoder, x, t, mask, offset)
         # g = self.rpgnn(self.encoder, x, t, mask, offset=offset)
+
         g = g * mask
+
+        # t = t[:,return_idx]
+        # g = g[:,return_idx]
 
         return t, g
 
