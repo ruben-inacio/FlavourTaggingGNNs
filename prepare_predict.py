@@ -56,6 +56,33 @@ def test_step(params, batch):
         batch['jet_theta'],
     )[:6]
 
+
+@partial(jax.pmap, axis_name="device", in_axes=(None, 0, 0, 0),  out_axes=(0, 0))
+def test_step_pmap(key, state, batch_x, batch_y):    
+
+    def test_step(state, batch_x, batch_y):
+        batch = get_batch(batch_x, batch_y, -1)
+        mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+        out = model.apply(
+                {'params': state.params}, 
+                batch['x'], 
+                mask, 
+                batch['jet_vtx'], 
+                batch['trk_vtx'],
+                batch['n_tracks'],
+                batch['jet_phi'],
+                batch['jet_theta'],
+                batch['epoch']
+            )
+    
+        return out[:6]
+
+    test_step_vmap = jax.vmap(test_step, in_axes=(None, 0, 0), out_axes=(0, 0))
+
+    out = test_step_vmap(state, batch_x, batch_y)
+
+    return out
+
 def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, ensemble_id=0, truth_only=False):
     pred_mu = []
     pred_sigma = []
@@ -101,7 +128,8 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
             true_edges.append(edge_y)
     
             if not truth_only:
-                out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step(params, batch)
+                out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step_pmap(params, x, y)
+                # out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step(params, batch)
                 
                 if out_nodes is not None:
                     pred_nodes.append(out_nodes)#[mask])
@@ -141,27 +169,39 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
     true_nodes = np.concatenate(true_nodes)
     true_edges = np.concatenate(true_edges)
 
+    arrays_to_store = {}
+
     if pred_nodes != []:
         pred_nodes = np.concatenate(pred_nodes)
         print(pred_nodes.shape)
-        np.save(f'{save_dir}/results_nodes_clf_{ensemble_id}.npy', pred_nodes)
+        # np.save(f'{save_dir}/results_nodes_clf_{ensemble_id}.npy', pred_nodes)
+        arrays_to_store['results_nodes_clf'] = pred_nodes
+
     if pred_edges != []:
         pred_edges = np.concatenate(pred_edges)
-        np.save(f'{save_dir}/results_edges_clf_{ensemble_id}.npy', pred_edges)
         print(pred_edges.shape)
+        # np.save(f'{save_dir}/results_edges_clf_{ensemble_id}.npy', pred_edges)
+        arrays_to_store['results_edges_clf'] = pred_edges
+
     if pred_flavours != []:
         pred_flavours = np.concatenate(pred_flavours)
         print(pred_flavours.shape)
-        np.save(f'{save_dir}/results_graph_clf_{ensemble_id}.npy', pred_flavours)
+        # np.save(f'{save_dir}/results_graph_clf_{ensemble_id}.npy', pred_flavours)
+        arrays_to_store['results_graph_clf'] = pred_flavours
+
     if pred_mu != []:
         pred_mu = np.concatenate(pred_mu)
         print(pred_mu.shape)
-        np.save(f'{save_dir}/results_graph_reg_{ensemble_id}.npy', pred_mu)
+        # np.save(f'{save_dir}/results_graph_reg_{ensemble_id}.npy', pred_mu)
+        arrays_to_store['results_graph_reg'] = pred_mu
+
     if pred_sigma != []:
         pred_sigma = np.concatenate(pred_sigma)
-        np.save(f'{save_dir}/results_graph_reg_var_{ensemble_id}.npy', pred_sigma)
         print(pred_sigma.shape)
-
+        # np.save(f'{save_dir}/results_graph_reg_var_{ensemble_id}.npy', pred_sigma)
+        arrays_to_store['results_graph_reg_var'] = pred_sigma
+        
+    np.savez_compressed(f'{save_dir}/results_{ensemble_id}.npz',**arrays_to_store)
     print(true.shape)
     print(true_flavours.shape)
     print(jet_pts.shape)

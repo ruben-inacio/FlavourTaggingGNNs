@@ -78,11 +78,12 @@ if __name__ == "__main__":
 
 
         for run in range(opt.ensemble_size):
+            results_model_run = np.load(f"{m}/results_{run}.npz")
             try:
-                results_fitting = np.load(f"{m}/results_graph_reg_{run}.npy")
+                results_fitting = results_model_run['results_graph_reg']  # np.load(f"{m}/results_graph_reg_{run}.npy")
                 assert(results_fitting.ndim == 2 and results_fitting.shape[1] == 3)
                 assert(results_fitting.shape[0] == true_graph.shape[0])
-                results_errors = np.load(f"{m}/results_graph_reg_var_{run}.npy")
+                results_errors = results_model_run['results_graph_reg_var'] # np.load(f"{m}/results_graph_reg_var_{run}.npy")
                 if results_errors.ndim == 3:
                     assert(results_errors.shape[1] == results_errors.shape[2] == 3)
                     diag = [
@@ -101,7 +102,7 @@ if __name__ == "__main__":
                 do_regression = False
 
             try:
-                results_graph_clf = np.load(f"{m}/results_graph_clf_{run}.npy")
+                results_graph_clf = results_model_run['results_graph_clf']  # np.load(f"{m}/results_graph_clf_{run}.npy")
                 assert(results_graph_clf.shape[0] == true_graph.shape[0])
                 predictions_graph_clf[-1].append(results_graph_clf)
 
@@ -111,13 +112,13 @@ if __name__ == "__main__":
                 do_classifications = False
             
             try:
-                results_nodes_clf = np.load(f"{m}/results_nodes_clf_{run}.npy")
+                results_nodes_clf = results_model_run['results_nodes_clf']  # np.load(f"{m}/results_nodes_clf_{run}.npy")
                 results_nodes_clf = results_nodes_clf.reshape(-1, 4)
                 if true_nodes.shape[0] < results_nodes_clf.shape[0]:
                     results_nodes_clf = results_nodes_clf[valid_nodes]
                 assert(results_nodes_clf.shape[0] == true_nodes.shape[0])
 
-                results_edges_clf = np.load(f"{m}/results_edges_clf_{run}.npy")
+                results_edges_clf = results_model_run['results_edges_clf']  # np.load(f"{m}/results_edges_clf_{run}.npy")
                 if results_edges_clf.ndim == 3:
                     results_edges_clf = results_edges_clf.reshape(-1, results_edges_clf.shape[-1])
                     if true_edges.shape[0] < results_edges_clf.shape[0]:
