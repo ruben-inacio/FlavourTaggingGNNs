@@ -71,9 +71,9 @@ class TN1(nn.Module):
                 layers=                  1,
                 heads=                   1,
                 strategy_sampling=       None,
-                strategy_weights=        "compute",  # "perfect",
+                strategy_weights=        "perfect",  # "compute",
                 use_ghost_track=         False,
-                activation =             "softmax",  # None,
+                activation =             None,  # "softmax",
                 method=                  self.strategy_prediction,
                 encoding_strategy=       None,
                 seed= self.seed
@@ -83,7 +83,7 @@ class TN1(nn.Module):
         else:
             self.apply_strategy_prediction_fn = lambda *args: (None, None, None, None, None, None)
         
-        # Output MLPs
+        # Classifier Module containing the output MLPs
 
         self.mlp_graph = nn.Sequential([
             nn.Dense(2 * self.hidden_channels, param_dtype=jnp.float64),
@@ -197,6 +197,9 @@ class TN1(nn.Module):
             repr_track = self.propagate_fn(x, mask, out_mean, out_var)
         else:
             repr_track = self.propagate_fn(x, mask, offset)
+            
+        ### Classifier module computations ###
+        
         # Compute jet-level representation
         repr_jet, _ = self.pool(repr_track, mask)
 
