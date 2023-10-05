@@ -133,6 +133,19 @@ class TN1(nn.Module):
     
     def add_reference(self, x, mask, new_ref, new_ref_errors):
         batch_size, n_tracks, _ = x.shape
+
+        if self.propagate_independently is None:
+            x_points = jnp.repeat(new_ref, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
+            if new_ref_errors.ndim == 3:
+                new_ref_errors = jax.lax.map(jnp.diag, new_ref_errors)
+            x_errors = jnp.repeat(new_ref_errors, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
+            
+            x = jnp.concatenate([x, x_points], axis=2)
+            x = self.scale_fn(x)
+
+            t, g = self.preprocessor(x, mask)
+            return g
+
         x_prime = self.extrapolator(x, jax.lax.stop_gradient(new_ref))
         x_prime = x_prime * mask    
         if self.points_as_features:
@@ -142,8 +155,8 @@ class TN1(nn.Module):
                 new_ref_errors = jax.lax.map(jnp.diag, new_ref_errors)
             x_points = jnp.repeat(new_ref, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
             x_errors = jnp.repeat(new_ref_errors, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
-            x_points = jax.lax.stop_gradient(x_points)
-            x_errors = jax.lax.stop_gradient(x_errors)
+            # x_points = jax.lax.stop_gradient(x_points)
+            # x_errors = jax.lax.stop_gradient(x_errors)
             x_prime = jnp.concatenate([x_prime, x_points], axis=2)
             if self.errors_as_features:
                 x = jnp.concatenate([x, jnp.zeros(shape=(batch_size, n_tracks, 3))], axis=2)

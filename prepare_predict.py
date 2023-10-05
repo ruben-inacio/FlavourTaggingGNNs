@@ -11,6 +11,7 @@ if "lipml" in host:
 
 from flax.training import checkpoints
 import jax
+import flax
 import torch
 import pickle
 from models.Predictor import Predictor
@@ -18,7 +19,9 @@ from models.GN2Plus import TN1
 from utils.layers import mask_tracks
 import numpy as np
 import argparse
-
+from functools import partial
+from flax.training import train_state
+import optax
 from train_utils import get_batch, DEFAULT_MODEL_DIR, DEFAULT_DIR, get_model
 import json
 import random
@@ -57,13 +60,13 @@ def test_step(params, batch):
     )[:6]
 
 
-@partial(jax.pmap, axis_name="device", in_axes=(None, 0, 0, 0),  out_axes=(0, 0))
+@partial(jax.pmap, axis_name="device", in_axes=(None, 0, 0, 0),  out_axes=(0, 0, 0, 0, 0, 0))
 def test_step_pmap(key, state, batch_x, batch_y):    
 
-    def test_step(state, batch_x, batch_y):
+    def test_step_aux(state, batch_x, batch_y):
         batch = get_batch(batch_x, batch_y, -1)
         mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
-        out = model.apply(
+        out_graph, out_nodes, out_edges, p_mu, p_var, _ = model.apply(
                 {'params': state.params}, 
                 batch['x'], 
                 mask, 
@@ -75,13 +78,13 @@ def test_step_pmap(key, state, batch_x, batch_y):
                 batch['epoch']
             )
     
-        return out[:6]
+        return out_graph, out_nodes, out_edges, p_mu, p_var, _
 
-    test_step_vmap = jax.vmap(test_step, in_axes=(None, 0, 0), out_axes=(0, 0))
+    test_step_vmap = jax.vmap(test_step_aux, in_axes=(None, 0, 0), out_axes=(0, 0, 0, 0, 0, 0))
 
-    out = test_step_vmap(state, batch_x, batch_y)
+    out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step_vmap(state, batch_x, batch_y)
 
-    return out
+    return out_graph, out_nodes, out_edges, p_mu, p_var, _
 
 def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, ensemble_id=0, truth_only=False):
     pred_mu = []
@@ -99,65 +102,79 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
     pred_flavours = []
     out_graph, out_nodes, out_edges, p_mu, p_var = [None] * 5
     dl.pin_memory_device = []
-    for i, dd in enumerate(dl):
+
+    state = train_state.TrainState.create(
+        apply_fn=model.apply,
+        params=params,
+        tx=optax.novograd(0.1),
+    )
+    state_dist = flax.jax_utils.replicate(state)
+
+    # for i, dd in enumerate(dl):
+    for i, d in enumerate(dl):
         print("batch ", i, "/", len(dl))
         # if i == 1:
         #     break
-        for j in range(dd.x.shape[0] // N_JETS):
-            x = dd.x[N_JETS*j:N_JETS*(j+1), :, :]
-            y = dd.y[N_JETS*j:N_JETS*(j+1), :, :]
+        # for j in range(dd.x.shape[0] // N_JETS):
+        #     x = dd.x[N_JETS*j:N_JETS*(j+1), :, :]
+        #     y = dd.y[N_JETS*j:N_JETS*(j+1), :, :]
 
-            x = np.array(x)
-            y = np.array(y)
-        
-            jet_pts.append(x[:, 0, 26])
-            jet_etas.append(x[:, 0, 27])
-            jet_trks.append(x[:, 0, 22])
-            batch = get_batch(x, y)
-            
-            mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
-            mask = mask[:, :, 0]
-            mask_edges = mask_edges.reshape(-1, 225)
-            
-            trk_y = np.argmax(batch['trk_y'], axis=2)
-            trk_y = np.where(mask, trk_y, -1).reshape(-1) #trk_y[mask].reshape(-1)
-            true_nodes.append(trk_y)
-
-            edge_y = np.argmax(batch['edge_y'], axis=2)
-            edge_y = np.where(mask_edges, edge_y, -1).reshape(-1) # edge_y[mask_edges].reshape(-1)
-            true_edges.append(edge_y)
+        x = np.array(d.x)
+        y = np.array(d.y)
     
-            if not truth_only:
-                out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step_pmap(params, x, y)
-                # out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step(params, batch)
-                
-                if out_nodes is not None:
-                    pred_nodes.append(out_nodes)#[mask])
-                if out_edges is not None:
-                    pred_edges.append(out_edges)#[mask_edges])
-                if out_graph is not None:
-                    pred_flavours.append(out_graph)
+        jet_pts.append(x[:, 0, 26])
+        jet_etas.append(x[:, 0, 27])
+        jet_trks.append(x[:, 0, 22])
+        batch = get_batch(x, y)
         
-                this_pred_mu, this_pred_var = p_mu, p_var 
+        mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
+        mask = mask[:, :, 0]
+        mask_edges = mask_edges.reshape(-1, 225)
+        
+        trk_y = np.argmax(batch['trk_y'], axis=2)
+        trk_y = np.where(mask, trk_y, -1).reshape(-1) #trk_y[mask].reshape(-1)
+        true_nodes.append(trk_y)
 
-                if this_pred_mu is not None:
-                    if scy is not None:
-                        this_pred_mu = np.array(scy.inverse_transform(this_pred_mu))
-                    pred_mu.append(this_pred_mu)
-                
-                if this_pred_var is not None:
-                    this_pred_sigma = this_pred_var
-                    # this_pred_sigma = np.sqrt(np.exp(this_pred_var))
-                    if scy is not None:
-                        this_pred_sigma = np.array(scy.inverse_transform(this_pred_sigma.reshape(-1,3)))
-                    pred_sigma.append(this_pred_sigma)
+        edge_y = np.argmax(batch['edge_y'], axis=2)
+        edge_y = np.where(mask_edges, edge_y, -1).reshape(-1) # edge_y[mask_edges].reshape(-1)
+        true_edges.append(edge_y)
+
+        if not truth_only:
+            device_count = jax.device_count()
+            test_vmap_count = 40 // device_count
+            x = jax.tree_map(lambda m: m.reshape((device_count, test_vmap_count, -1, *m.shape[1:])), x)
+            y = jax.tree_map(lambda m: m.reshape((device_count, test_vmap_count, -1, *m.shape[1:])), y)
             
-            this_true = batch['jet_vtx'] # d.jet_vtx.reshape(-1, 3)
-            if scy is not None:
-                this_true = np.array(scy.inverse_transform(this_true))
-            true.append(this_true)
+            out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step_pmap(jax.random.PRNGKey(0), state_dist, x, y)
+            # out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step(params, batch)
 
-            true_flavours.append(np.argmax(batch['jet_y'], axis=1))
+            if out_nodes is not None:
+                pred_nodes.append(out_nodes)#[mask])
+            if out_edges is not None:
+                pred_edges.append(out_edges)#[mask_edges])
+            if out_graph is not None:
+                pred_flavours.append(out_graph)
+    
+            this_pred_mu, this_pred_var = p_mu, p_var 
+
+            if this_pred_mu is not None:
+                if scy is not None:
+                    this_pred_mu = np.array(scy.inverse_transform(this_pred_mu))
+                pred_mu.append(this_pred_mu)
+            
+            if this_pred_var is not None:
+                this_pred_sigma = this_pred_var
+                # this_pred_sigma = np.sqrt(np.exp(this_pred_var))
+                if scy is not None:
+                    this_pred_sigma = np.array(scy.inverse_transform(this_pred_sigma.reshape(-1,3)))
+                pred_sigma.append(this_pred_sigma)
+        
+        this_true = batch['jet_vtx'] # d.jet_vtx.reshape(-1, 3)
+        if scy is not None:
+            this_true = np.array(scy.inverse_transform(this_true))
+        true.append(this_true)
+
+        true_flavours.append(np.argmax(batch['jet_y'], axis=1))
     ####
 
     true = np.concatenate(true)
@@ -200,8 +217,8 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
         print(pred_sigma.shape)
         # np.save(f'{save_dir}/results_graph_reg_var_{ensemble_id}.npy', pred_sigma)
         arrays_to_store['results_graph_reg_var'] = pred_sigma
-        
-    np.savez_compressed(f'{save_dir}/results_{ensemble_id}.npz',**arrays_to_store)
+    if not truth_only:
+        np.savez_compressed(f'{save_dir}/results_{ensemble_id}.npz',**arrays_to_store)
     print(true.shape)
     print(true_flavours.shape)
     print(jet_pts.shape)
@@ -212,13 +229,13 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
     print("valid_nodes =", (true_nodes > -1).sum())
     print("valid_edges =", (true_edges > -1).sum())
     if save_truth:
-        np.save('../ground_truth/jet_vtx.npy', true)
-        np.save('../ground_truth/trk_y.npy', true_nodes)
-        np.save('../ground_truth/edge_y.npy', true_edges)
-        np.save('../ground_truth/jet_y.npy', true_flavours)
-        np.save('../ground_truth/jet_pts.npy', jet_pts)
-        np.save('../ground_truth/jet_etas.npy', jet_etas)
-        np.save('../ground_truth/jet_trks.npy', jet_trks)
+        np.save('../ground_truth_final/jet_vtx.npy', true)
+        np.save('../ground_truth_final/trk_y.npy', true_nodes)
+        np.save('../ground_truth_final/edge_y.npy', true_edges)
+        np.save('../ground_truth_final/jet_y.npy', true_flavours)
+        np.save('../ground_truth_final/jet_pts.npy', jet_pts)
+        np.save('../ground_truth_final/jet_etas.npy', jet_etas)
+        np.save('../ground_truth_final/jet_trks.npy', jet_trks)
 
 
     return pred_mu, pred_sigma, true, true_flavours, jet_pts, jet_trks   

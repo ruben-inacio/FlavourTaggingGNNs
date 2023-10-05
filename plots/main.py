@@ -20,11 +20,11 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-save_dir')
     parser.add_argument('-ensemble_size', type=int, default=1)
-    parser.add_argument('-regression', type=bool, default=True)
+    parser.add_argument('-regression', type=bool, default=False)
     parser.add_argument('-atlas_roc', type=bool, default=True)
     parser.add_argument('-classifications', type=bool, default=True)
     return parser.parse_args()
-
+   
 
 if __name__ == "__main__":
     opt = parse_args()
@@ -76,14 +76,27 @@ if __name__ == "__main__":
         predictions_nodes_clf.append([])
         predictions_edges_clf.append([])
 
-
         for run in range(opt.ensemble_size):
-            results_model_run = np.load(f"{m}/results_{run}.npz")
+            try: 
+                results_model_run = np.load(f"{m}/results_{run}.npz")
+                old_files = False
+            except Exception:
+                old_files = True
+
             try:
-                results_fitting = results_model_run['results_graph_reg']  # np.load(f"{m}/results_graph_reg_{run}.npy")
+                if old_files:
+                    results_fitting = np.load(f"{m}/results_graph_reg_{run}.npy")
+                else:
+                    results_fitting = results_model_run['results_graph_reg']
+
                 assert(results_fitting.ndim == 2 and results_fitting.shape[1] == 3)
                 assert(results_fitting.shape[0] == true_graph.shape[0])
-                results_errors = results_model_run['results_graph_reg_var'] # np.load(f"{m}/results_graph_reg_var_{run}.npy")
+
+                if old_files:
+                    results_errors = np.load(f"{m}/results_graph_reg_var_{run}.npy")
+                else:
+                    results_errors = results_model_run['results_graph_reg_var']
+
                 if results_errors.ndim == 3:
                     assert(results_errors.shape[1] == results_errors.shape[2] == 3)
                     diag = [
@@ -102,7 +115,11 @@ if __name__ == "__main__":
                 do_regression = False
 
             try:
-                results_graph_clf = results_model_run['results_graph_clf']  # np.load(f"{m}/results_graph_clf_{run}.npy")
+                if old_files:
+                    results_graph_clf = np.load(f"{m}/results_graph_clf_{run}.npy")
+                else:
+                    results_graph_clf = results_model_run['results_graph_clf']
+
                 assert(results_graph_clf.shape[0] == true_graph.shape[0])
                 predictions_graph_clf[-1].append(results_graph_clf)
 
@@ -112,13 +129,21 @@ if __name__ == "__main__":
                 do_classifications = False
             
             try:
-                results_nodes_clf = results_model_run['results_nodes_clf']  # np.load(f"{m}/results_nodes_clf_{run}.npy")
+                if old_files:
+                    results_nodes_clf = np.load(f"{m}/results_nodes_clf_{run}.npy")
+                else:
+                    results_nodes_clf = results_model_run['results_nodes_clf']
+
                 results_nodes_clf = results_nodes_clf.reshape(-1, 4)
                 if true_nodes.shape[0] < results_nodes_clf.shape[0]:
                     results_nodes_clf = results_nodes_clf[valid_nodes]
                 assert(results_nodes_clf.shape[0] == true_nodes.shape[0])
 
-                results_edges_clf = results_model_run['results_edges_clf']  # np.load(f"{m}/results_edges_clf_{run}.npy")
+                if old_files:
+                    results_edges_clf = np.load(f"{m}/results_edges_clf_{run}.npy")
+                else:
+                    results_edges_clf = results_model_run['results_edges_clf']
+
                 if results_edges_clf.ndim == 3:
                     results_edges_clf = results_edges_clf.reshape(-1, results_edges_clf.shape[-1])
                     if true_edges.shape[0] < results_edges_clf.shape[0]:
@@ -150,7 +175,8 @@ if __name__ == "__main__":
         plot_fitting_average(predictions_fitting, predictions_errors, true_vtx, true_graph, jet_pts, labels, [20, 40, 60, 80, 100, 200])
 
     if do_jet_cmp:
-        performance_cmp_jets(predictions_graph_clf, true_graph, labels, jet_pts, jet_etas)
+        performance_cmp_jets(predictions_graph_clf, true_graph, labels, jet_pts, jet_etas, jet_trks)
+        #performance_cmp_jets(predictions_graph_clf, true_graph, labels, jet_pts, jet_etas)
 
     if do_classifications:
         plot_classifications(predictions_graph_clf, true_graph, labels, "graph")
