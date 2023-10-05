@@ -434,7 +434,8 @@ def parse_args():
     parser.add_argument('-name', default="test", type=str)
     parser.add_argument('-optimiser', default="adam", type=str)
     parser.add_argument('-lr', default=1e-3, type=float)
-
+    parser.add_argument('-warmup_only', default=False, type=bool)
+    parser.add_argument('-train_after_warmup', default=-1, type=int)
     return parser.parse_args()
 
 
@@ -497,7 +498,15 @@ if __name__ == "__main__":
     optimiser = opt.optimiser
     num_instances = sum([fn.startswith('loss_history') for fn in os.listdir(save_dir)])
     print("Number of instances already trained:", num_instances)
-    
+    if opt.train_after_warmup != -1:
+        model = get_model(opt.model, save_dir=save_dir, instance=opt.train_after_warmup)
+        with open(f"{save_dir}/params_{opt.train_after_warmup}.pickle", 'rb') as fp:
+            params = pickle.load(fp)
+        rng, state = init_model(rng, model, optimiser, lr=opt.lr)
+        ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=opt.train_after_warmup, optimiser=optimiser, lr=lr, early_stop=early_stop)
+        print(f"Best model stats - epoch {ckpt['epoch']}:")
+        print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
+        return 
     for instance_id in range(num_instances, opt.ensemble_size):
         model = get_model(opt.model, save_dir=save_dir, instance=instance_id)
         lr = opt.lr
@@ -508,6 +517,8 @@ if __name__ == "__main__":
         if lr > .0005 and isinstance(model, TN1):
             state, early_stop = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr)
             lr = lr / 10
+        if opt.warmup_only:
+            continue
         ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr, early_stop=early_stop)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
