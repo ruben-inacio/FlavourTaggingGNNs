@@ -506,7 +506,7 @@ if __name__ == "__main__":
         ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=opt.train_after_warmup, optimiser=optimiser, lr=lr, early_stop=early_stop)
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
-        return 
+        exit(0) 
     for instance_id in range(num_instances, opt.ensemble_size):
         model = get_model(opt.model, save_dir=save_dir, instance=instance_id)
         lr = opt.lr
