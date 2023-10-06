@@ -119,7 +119,8 @@ if __name__ == "__main__":
                     results_graph_clf = np.load(f"{m}/results_graph_clf_{run}.npy")
                 else:
                     results_graph_clf = results_model_run['results_graph_clf']
-
+                if results_graph_clf.ndim == 4:
+                    results_graph_clf = results_graph_clf.reshape(-1, 3)
                 assert(results_graph_clf.shape[0] == true_graph.shape[0])
                 predictions_graph_clf[-1].append(results_graph_clf)
 
@@ -127,6 +128,8 @@ if __name__ == "__main__":
                 print("ATLAS ROC, classification plots disabled.")
                 do_jet_cmp = False
                 do_classifications = False
+
+                # raise e
             
             try:
                 if old_files:
@@ -144,6 +147,8 @@ if __name__ == "__main__":
                 else:
                     results_edges_clf = results_model_run['results_edges_clf']
 
+                if results_edges_clf.ndim == 5:
+                    results_edges_clf = results_edges_clf.reshape(-1, results_edges_clf.shape[-2], results_edges_clf.shape[-1])
                 if results_edges_clf.ndim == 3:
                     results_edges_clf = results_edges_clf.reshape(-1, results_edges_clf.shape[-1])
                     if true_edges.shape[0] < results_edges_clf.shape[0]:
@@ -159,7 +164,6 @@ if __name__ == "__main__":
                 print("Classification plots disabled.")
                 do_classifications = False
                 # raise e
-
 
     labels = settings['labels_models']
     if do_regression:
