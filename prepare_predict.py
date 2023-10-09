@@ -24,6 +24,7 @@ from flax.training import train_state
 import optax
 from train_utils import get_batch, DEFAULT_MODEL_DIR, DEFAULT_DIR, get_model
 import json
+import time
 import random
 # Configuring seeds
 seed = 42
@@ -109,7 +110,7 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
         tx=optax.novograd(0.1),
     )
     state_dist = flax.jax_utils.replicate(state)
-
+    inference_times = []
     # for i, dd in enumerate(dl):
     for i, d in enumerate(dl):
         print("batch ", i, "/", len(dl))
@@ -145,9 +146,12 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
             x = jax.tree_map(lambda m: m.reshape((device_count, test_vmap_count, -1, *m.shape[1:])), x)
             y = jax.tree_map(lambda m: m.reshape((device_count, test_vmap_count, -1, *m.shape[1:])), y)
             
+            t0 = time.time()
             out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step_pmap(jax.random.PRNGKey(0), state_dist, x, y)
             # out_graph, out_nodes, out_edges, p_mu, p_var, _ = test_step(params, batch)
-
+            t1 = time.time()
+            delta_t = t1 - t0
+            inference_times.append(delta_t)
             if out_nodes is not None:
                 pred_nodes.append(out_nodes)#[mask])
             if out_edges is not None:
@@ -219,6 +223,11 @@ def store_predictions(model, params, dl, save_dir, scy=None, save_truth=False, e
         arrays_to_store['results_graph_reg_var'] = pred_sigma
     if not truth_only:
         np.savez_compressed(f'{save_dir}/results_{ensemble_id}.npz',**arrays_to_store)
+        param_count = sum(x.size for x in jax.tree_util.tree_leaves(state.params))
+        with open(f'{save_dir}/info_{ensemble_id}.txt', "w") as timef:
+            timef.write(f"inference times = {sum(inference_times)}\n")
+            timef.write(f"num parameters = {param_count}\n")
+            
     print(true.shape)
     print(true_flavours.shape)
     print(jet_pts.shape)

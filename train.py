@@ -507,8 +507,10 @@ if __name__ == "__main__":
         print(f"Best model stats - epoch {ckpt['epoch']}:")
         print(f"Loss (train, valid) = ({ckpt['loss_train']}, {ckpt['loss_valid']})")
         exit(0) 
+    with open("configs_models.json", "r") as f:
+            settings = json.load(f)[opt.model]
     for instance_id in range(num_instances, opt.ensemble_size):
-        model = get_model(opt.model, save_dir=save_dir, instance=instance_id)
+        model = get_model(opt.model, save_dir=save_dir, settings=settings, instance=instance_id)
         lr = opt.lr
         print("Instance number:", instance_id)
         rng, state = init_model(rng, model, optimiser, lr=opt.lr)

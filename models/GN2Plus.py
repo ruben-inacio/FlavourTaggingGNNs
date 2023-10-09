@@ -71,9 +71,9 @@ class TN1(nn.Module):
                 layers=                  1,
                 heads=                   1,
                 strategy_sampling=       None,
-                strategy_weights=        "perfect",  # "compute",
+                strategy_weights=        "compute", #"perfect",  # "compute",
                 use_ghost_track=         False,
-                activation =             None,  # "softmax",
+                activation =             "softmax", #None,  # "softmax",
                 method=                  self.strategy_prediction,
                 encoding_strategy=       None,
                 seed= self.seed
