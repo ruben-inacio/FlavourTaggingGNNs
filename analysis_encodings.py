@@ -28,6 +28,44 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
+path = "../models_slac/gn2_eye"
+
+with open(path + "/params_0.pickle", 'rb') as f:
+    params = pickle.load(f)
+
+
+
+
+
+for layer in range(3):
+    l = f"enc_layer_{layer}"
+    for k in list(params['preprocessor']['encoder'][l]['attn'].keys()):
+        print(k, params['preprocessor']['encoder'][l]['attn'][k]['kernel'].shape)
+        print(k, params['preprocessor']['encoder'][l]['attn'][k]['bias'].shape)
+        fig, ax = plt.subplots(1, 2,figsize=(16,8))
+
+        kernel = params['preprocessor']['encoder'][l]['attn'][k]['kernel'][:, 0, :]
+        bias = params['preprocessor']['encoder'][l]['attn'][k]['kernel'][:, 1, :]
+        # bias = params['preprocessor']['encoder'][l]['attn'][k]['bias']
+        if bias.ndim == 1:
+            bias = bias.reshape(1, bias.shape[0])
+        vmin = min(kernel.min(), bias.min())
+        # print(data_model[5, 1], data_model[6, 1])
+        vmax = max(kernel.max(), bias.max())
+        cmap = "winter"
+        d1 = ax[0].imshow(kernel, cmap=cmap, vmin=vmin, vmax=vmax)
+        d2 = ax[1].imshow(bias, cmap=cmap, vmin=vmin, vmax=vmax)
+        plt.tight_layout()
+        fig.colorbar(d1)
+        fig.colorbar(d2)
+        plt.savefig(f"../analysis/layer_{layer}/attn_weights_{k}_{path.split('/')[-1]}.png")
+        plt.close()
+
+print(list(params['preprocessor']['encoder']['enc_layer_0']['lin1'].keys()))
+# print(list(params['preprocessor']['encoder'].keys()))
+
+
+exit(0)
 base_path = "../models_v2/gn2ndive_atlas"
 model_path = "../models_v2/gn2ndive_atlas_onehot_none"
 

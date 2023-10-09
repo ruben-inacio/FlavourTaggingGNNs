@@ -1,16 +1,16 @@
 {
-    "results_dir": "../../comparisons/section5_ndive",
+    "results_dir": "../../comparisons_tst0210",
     "models_2": [
          "../../final_results_old/gn2_adamw001_batch250", "../../section5_enc/gn2_simple_eye", "../../section5_enc/gn2_random_fixed"
     ],
     "models": [
-        "../../section5_ndive/ndive", "../../section5_ndive/ndive_simple_eye"
+        "../../models_slac/gn2", "../../models_slac/gn2_ndive", "../../models_slac/gn2_ndive_augm_independent" 
     ],
     "labels_models": [
-       "ndive", "ndive enc"
+       "GN2", "GN2+ Naive", "GN2+ NDIVE"
     ],
     "labels_graph": [
-        "b", "c", "u"
+        "b", "c", "l"
     ],
     "labels_edges": [
         "Common",
@@ -23,10 +23,11 @@
         "Other"
     ],
     "colors": [
-        "red", 
-        "blue", 
-        "dodgerblue", 
-        "skyblue"
+        "red",
+        "(186/255, 228/255, 188/255)",
+        "(123/255, 204/255, 196/255)",
+        "(67/255, 162/255, 202/255)",
+        "(8/255, 104/255, 172/255)"
     ],
     "colors_flavours": [
         "forestgreen", 
@@ -35,9 +36,23 @@
     ],
     "ground_truth": "../../ground_truth",
     "ground_truth_rachel": "../../DifferentiableVertexingProject",
-    "ground_truth_original": "../../ground_truth_1407",
+    "ground_truth_original": ["../../ground_truth_1407", "ground_truth_2608"],
     "ndive_path": [
         "../../DifferentiableVertexingProject/models/ftag_wVertexFit_NDIVE/"
+    ],
+    "colors_atlas_pallete": [
+        "(213/255, 23/255, 78/255)",
+        "(0, 191/255, 1)",
+        "(102/255, 205/255, 170/255)",
+        "(221/255, 133/255, 215/255)",
+        "(1, 177/255, 109/255)"
+    ],
+    "colors_custom_pallete": [
+        "(240/255, 249/255, 232/255)",
+        "(186/255, 228/255, 188/255)",
+        "(123/255, 204/255, 196/255)",
+        "(67/255, 162/255, 202/255)",
+        "(8/255, 104/255, 172/255)"
     ]
 
 }

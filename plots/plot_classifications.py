@@ -137,7 +137,12 @@ def prepare_ROC_jet_ATLAS_bcujets(pred, true, f=0.05, rej_threshold=100.0):
     return (sig_eff[valid_sig], cbkg_rej[valid_sig], ubkg_rej[valid_sig])
 
 
+
 def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
+    def find_nearest(array, value):
+        array = np.asarray(array)
+        idx = (np.abs(array - value)).argmin()
+        return idx
     font = {'family' : 'sans-serif',
         'size'   : 18}
     plt.rc('font', **font)
@@ -197,8 +202,15 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
     baseline_sig_eff, baseline_cbkg_rej, baseline_ubkg_rej = sig_eff_allmeans[0], bkg_crej_allmeans[0], bkg_urej_allmeans[0]
     cbkg_rej_finder = interpolate.interp1d(baseline_sig_eff,baseline_cbkg_rej,bounds_error=False)
     ubkg_rej_finder = interpolate.interp1d(baseline_sig_eff,baseline_ubkg_rej,bounds_error=False)
+    c_rej_70 = []
+    c_rej_85 = []
+    u_rej_70 = []
+    u_rej_85 = []
     for r in range(len(jet_results)):
         num_sig_eff, num_cbkg_rej, num_ubkg_rej = sig_eff_allmeans[r], bkg_crej_allmeans[r], bkg_urej_allmeans[r]
+        idx_70 = find_nearest(num_sig_eff, 0.7)
+        idx_85 = find_nearest(num_sig_eff, 0.85)
+
         c_interp_baseline_rej = cbkg_rej_finder(num_sig_eff)
         u_interp_baseline_rej = ubkg_rej_finder(num_sig_eff)
         
@@ -213,6 +225,10 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
         ujet, = ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color='black', lw=2)
         ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color=colors[r], lw=2)
     
+        c_rej_70.append(c_ratio_of_rejections[idx_70])
+        c_rej_85.append(c_ratio_of_rejections[idx_85])
+        u_rej_70.append(u_ratio_of_rejections[idx_70])
+        u_rej_85.append(u_ratio_of_rejections[idx_85])
         tot_c_err = c_ratio_of_rejections * np.sqrt(
             np.square(bkg_crej_allstds[r]/num_cbkg_rej)+np.square(bkg_crej_allstds[0]/baseline_cbkg_rej)
         )
@@ -233,6 +249,8 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
     plt.savefig(f"{save_dir}/ATLAS_roc_ensemble_bcu.pdf")
     plt.close()
     reset_font()
+    with open(f"{save_dir}/ATLAS_roc_ensemble_wps.txt", "w") as fq:
+        fq.write(f" c70 {str(c_rej_70)}\n c85 {str(c_rej_85)}\n u70 {str(u_rej_70)}\n u85 {str(u_rej_85)}")
     return    
 
 
@@ -413,10 +431,13 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
                 print(model_acc_mean)
                 min_ = min(model_acc_mean.min(), min_)
                 max_ = max(model_acc_mean.max(), max_)
-                ax[0].plot(bins, model_acc_mean, label=labels[m], color=colors[m])
                 std_upper = model_acc_mean + model_acc_std
                 std_lower = model_acc_mean - model_acc_std
-                ax[0].fill_between(bins, std_lower, std_upper, color=colors[m], alpha=0.2)
+                lbl = labels[m]
+                for qq in range(0, len(bins)+1, 2):
+                    ax[0].plot(bins[qq:qq+2], model_acc_mean[qq:qq+2], label=lbl, color=colors[m])
+                    lbl = "_nolegend_"
+                    ax[0].fill_between(bins[qq:qq+2], std_lower[qq:qq+2], std_upper[qq:qq+2], color=colors[m], alpha=0.2)
 
                 models_acc.append(model_acc_mean)
             if flav == 0:
@@ -437,7 +458,10 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
             for r in range(len(jet_results)):
                 model_acc = models_acc[r]
                 ratio = model_acc / baseline_acc
-                ax[1].plot(bins, ratio, color=colors[r], label=labels[r])
+                lbl = labels[r]
+                for qq in range(0, len(bins)+1, 2):
+                    ax[1].plot(bins[qq:qq+2], ratio[qq:qq+2], color=colors[r], label=lbl)
+                    lbl = "_nolegend_"
 
             ax[1].set_xlabel(var_label)
             ax[1].set_ylabel("Ratio to " + labels[0])
@@ -541,9 +565,14 @@ def performance_cmp_jets(predictions, true_flavours, labels, jet_pts, jet_etas, 
         settings = json.load(f)
         results_dir = settings['results_dir']
         colors = settings['colors']
+        for c in range(len(colors)):
+            if colors[c][0] == "(":
+                colors[c] = eval(colors[c])
 
     compare_models_discriminator_ATLAS(predictions, true_flavours, results_dir, labels)
     compare_models_jet_ATLAS(results, colors, results_dir, labels)
     compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_pts, true_flavours, [20, 40, 60, 80, 100, 200], "pt", r"Jet $p_{T}$ [GeV]")
-    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, [-2.5, -1.5, -.5, .5, 1.5, 2.5], "eta", r"Jet $\eta$")
-    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_ntracks, true_flavours, [1, 3, 5, 7, 9, 11, 13, 15], "n_tracks", r"#Tracks")
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, [-2.5, -1, -.5, 0, .5, 1, 2.5], "eta", r"Jet $\eta$")
+    # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, [-2.5, -1.5, -.5, .5, 1.5, 2.5], "eta", r"Jet $\eta$")
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_ntracks, true_flavours, [1, 4, 8, 10, 12, 15], "n_tracks", r"#Tracks")
+    # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_ntracks, true_flavours, [1, 3, 5, 7, 9, 11, 13, 15], "n_tracks", r"#Tracks")
