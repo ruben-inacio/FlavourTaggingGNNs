@@ -4,10 +4,10 @@
          "../../final_results_old/gn2_adamw001_batch250", "../../section5_enc/gn2_simple_eye", "../../section5_enc/gn2_random_fixed"
     ],
     "models": [
-        "../../models_slac/gn2", "../../models_slac/gn2_ndive", "../../models_slac/gn2_ndive_augm_independent" 
+        "/sdf/scratch/r/rainacio/section5_baseline/gn2", "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_none", "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent" 
     ],
     "labels_models": [
-       "GN2", "GN2+ Naive", "GN2+ NDIVE"
+       "GN2", "GN2+ NDIVE points", "GN2+ NDIVE extrap"
     ],
     "labels_graph": [
         "b", "c", "l"
@@ -23,11 +23,11 @@
         "Other"
     ],
     "colors": [
-        "red",
-        "(186/255, 228/255, 188/255)",
-        "(123/255, 204/255, 196/255)",
-        "(67/255, 162/255, 202/255)",
-        "(8/255, 104/255, 172/255)"
+        "(255/255, 255/255, 204/255)",
+        "(161/255, 218/255, 180/255)",
+        "(65/255, 182/255, 196/255)",
+        "(44/255, 127/255, 184/255)",
+        "(37/255, 52/255, 148/255)" 
     ],
     "colors_flavours": [
         "forestgreen", 
@@ -53,6 +53,13 @@
         "(123/255, 204/255, 196/255)",
         "(67/255, 162/255, 202/255)",
         "(8/255, 104/255, 172/255)"
+    ],
+    "colors_custom_pallete_2": [
+        "(255/255, 255/255, 204/255)",
+        "(161/255, 218/255, 180/255)",
+        "(65/255, 182/255, 196/255)",
+        "(44/255, 127/255, 184/255)",
+        "(37/255, 52/255, 148/255)" 
     ]
 
 }
