@@ -36,22 +36,32 @@ def plot_confusion_matrix(predictions, targets, classes, name, save_dir):
 
 def plot_standard_roc(predictions, targets, classes, name, save_dir):
     plt.figure(figsize=(7,7))
-
+    font = {'family' : 'sans-serif',
+        'size'   : 16}
+    plt.rc('font', **font)
+    cs = ["(186/255, 228/255, 188/255)",
+        "(123/255, 204/255, 196/255)",
+        "(67/255, 162/255, 202/255)",
+        "(8/255, 104/255, 172/255)"]
+    if len(classes) == 2:
+        cs = cs[::2]
     for pos_class in range(len(classes)):
         fpr_node, tpr_node, _ = roc_curve(targets, predictions[:, pos_class], pos_label=pos_class)
         roc_auc = auc(fpr_node, tpr_node)
-        plt.plot(fpr_node,tpr_node,lw=2, label="%s (AUC = %0.2f)" % (classes[pos_class],roc_auc))
+        plt.plot(fpr_node,tpr_node,lw=3, label="%s (AUC = %0.3f)" % (classes[pos_class],roc_auc), color=eval(cs[pos_class]))
 
-    plt.plot([0, 1], [0, 1], color="navy", lw=1, linestyle="--")
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.0])
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.title("ROC: " + name + " classification")
+    plt.plot([0, 1], [0, 1], color="black", lw=1, linestyle="--")
+    # plt.xlim([0.0, 1.0])
+    # plt.ylim([0.0, 1.0])
+    plt.xlabel("False Positive Rate (FPR)")
+    plt.ylabel("True Positive Rate (TPR)")
+    plt.title("Model: " + name.split("_")[-1])
+    # plt.title("ROC: " + name + " classification")
     plt.legend(loc="lower right")
 
     plt.savefig(f"{save_dir}/standard_roc_{name}.pdf")
     plt.close()
+    reset_font()
 
 
 def prepare_ROC_jet_ATLAS_bcujets(pred, true, f=0.05, rej_threshold=100.0):
@@ -502,6 +512,9 @@ def compare_models_discriminator_ATLAS(jet_results, jet_true, save_dir, labels):
         discriminators_c.append(discriminator_model[jets_c])
         discriminators_b.append(discriminator_model[jets_b])
     
+    color_b = (46/255, 139/255, 86/255, 1.0) # "#2E8B56".lower() # 'forestgreen'
+    color_c = (255/255, 215/255, 0, 1.0) # "#FFD700 ".lower() # 'gold'
+    color_u = (100/255, 149/255, 237/255, 1.0) # "#6495ED".lower() # 'dodgerblue'
     for t in range(1, len(jet_results)):
         fig = plt.figure(figsize=(6, 4), dpi=100)
         ax = fig.add_subplot(111)
@@ -509,18 +522,18 @@ def compare_models_discriminator_ATLAS(jet_results, jet_true, save_dir, labels):
         fc = 0.05
         bins = np.linspace(-5,8,50)
 
-        ax.hist(discriminators_u[0], bins=bins, histtype='step', color='blue', label='u '+labels[0], linestyle='-', density=True)
-        ax.hist(discriminators_c[0], bins=bins, histtype='step', color='green', label='c '+labels[0], linestyle='-', density=True)
-        ax.hist(discriminators_b[0], bins=bins, histtype='step', color='red', label='b '+labels[0], linestyle='-', density=True)
+        ax.hist(discriminators_u[0], bins=bins, histtype='step', color=color_u, label='l-jets '+labels[0], linestyle='-', linewidth=5, density=True)
+        ax.hist(discriminators_c[0], bins=bins, histtype='step', color=color_c, label='c-jets '+labels[0], linestyle='-', linewidth=5, density=True)
+        ax.hist(discriminators_b[0], bins=bins, histtype='step', color=color_b, label='b-jets '+labels[0], linestyle='-', linewidth=5, density=True)
 
-        ax.hist(discriminators_u[t], bins=bins, histtype='step', color='blue', label='u '+labels[t], linestyle=':', density=True)
-        ax.hist(discriminators_c[t], bins=bins, histtype='step', color='green', label='c '+labels[t], linestyle=':', density=True)
-        ax.hist(discriminators_b[t], bins=bins, histtype='step', color='red', label='b '+labels[t], linestyle=':', density=True)
+        ax.hist(discriminators_u[t], bins=bins, histtype='step', color=color_u, label='l-jets '+labels[t], linestyle=':', linewidth=5, density=True)
+        ax.hist(discriminators_c[t], bins=bins, histtype='step', color=color_c, label='c-jets '+labels[t], linestyle=':', linewidth=5, density=True)
+        ax.hist(discriminators_b[t], bins=bins, histtype='step', color=color_b, label='b-jets '+labels[t], linestyle=':', linewidth=5, density=True)
 
         ax.legend(bbox_to_anchor=(1.0, 1.03), loc="upper left")
 
-        ax.set_xlabel('$D_b$', fontsize = 14)
-        ax.set_ylabel('a.u.', fontsize = 14)
+        ax.set_xlabel('$D_b$')
+        ax.set_ylabel('Arbitrary Units')
         ax.set_yscale("log")
         plt.tight_layout()
         plt.savefig(f"{save_dir}/discriminator_{labels[0]}_vs_{labels[t]}.pdf")
@@ -554,7 +567,11 @@ def plot_classifications(predictions, targets, labels, labels_key):
 
 
 def performance_cmp_jets(predictions, true_flavours, labels, jet_pts, jet_etas, jet_ntracks):
-
+    def equal_frequency(x, nbin):
+        nlen = len(x)
+        return list(np.interp(np.linspace(0, nlen, nbin + 1),
+                        np.arange(nlen),
+                        np.sort(x)))
     results = []
     for t in range(len(predictions)):
         model_results = []
@@ -575,8 +592,9 @@ def performance_cmp_jets(predictions, true_flavours, labels, jet_pts, jet_etas, 
 
     compare_models_discriminator_ATLAS(predictions, true_flavours, results_dir, labels)
     compare_models_jet_ATLAS(results, colors, results_dir, labels)
-    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_pts, true_flavours, [20, 40, 60, 80, 100, 200], "pt", r"Jet $p_{T}$ [GeV]")
-    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, [-2.5, -1, -.5, 0, .5, 1, 2.5], "eta", r"Jet $\eta$")
-    # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, [-2.5, -1.5, -.5, .5, 1.5, 2.5], "eta", r"Jet $\eta$")
-    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_ntracks, true_flavours, [1, 4, 8, 10, 12, 15], "n_tracks", r"#Tracks")
-    # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_ntracks, true_flavours, [1, 3, 5, 7, 9, 11, 13, 15], "n_tracks", r"#Tracks")
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_pts, true_flavours, equal_frequency(jet_pts, 5), "pt", r"Jet $p_{T}$ [GeV]")
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, equal_frequency(jet_etas, 5), "eta", r"Jet $\eta$")
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_ntracks, true_flavours, equal_frequency(jet_ntracks, 5), "n_tracks", r"#Tracks")
+    # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_pts, true_flavours, [20, 40, 60, 80, 100, 200], "pt", r"Jet $p_{T}$ [GeV]")
+    # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, [-2.5, -1, -.5, 0, .5, 1, 2.5], "eta", r"Jet $\eta$")
+    # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_ntracks, true_flavours, [1, 4, 8, 10, 12, 15], "n_tracks", r"#Tracks")
