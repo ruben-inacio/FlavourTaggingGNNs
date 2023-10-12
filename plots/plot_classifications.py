@@ -39,17 +39,41 @@ def plot_standard_roc(predictions, targets, classes, name, save_dir):
     font = {'family' : 'sans-serif',
         'size'   : 16}
     plt.rc('font', **font)
-    cs = ["(186/255, 228/255, 188/255)",
-        "(123/255, 204/255, 196/255)",
-        "(67/255, 162/255, 202/255)",
-        "(8/255, 104/255, 172/255)"]
+    # cs = ["(186/255, 228/255, 188/255)",
+    #     "(123/255, 204/255, 196/255)",
+    #     "(67/255, 162/255, 202/255)",
+    #     "(8/255, 104/255, 172/255)"]
+    #     # "(44/255,127/255,184/255)"]
+    # cs = [
+    #     "(161/255, 218/255, 180/255)",
+    #     "(65/255, 182/255, 196/255)",
+    #     "(44/255, 127/255, 184/255)",
+    #     "(37/255, 52/255, 148/255)" 
+    # ]
+    # # cs = [
+    # #     "(7/255, 242/255, 154/255)",
+    # #     "(4/255, 245/255, 223/255)",
+    # #     "(7/255, 200/255, 242/255)",
+    # #     "(7/255, 138/255, 241/255)"
+    # # ]
+    cs = [
+        "(7/255, 242/255, 154/255)",
+        "(186/255, 228/255, 188/255)",
+        "(7/255, 200/255, 242/255)",
+        "(7/255, 138/255, 241/255)"
+    ]
     if len(classes) == 2:
         cs = cs[::2]
-    for pos_class in range(len(classes)):
+    if len(classes) == 4:
+        l = (2, 0, 1, 3)
+    else:
+        l = range(len(classes))
+    i = 0
+    for pos_class in l:
         fpr_node, tpr_node, _ = roc_curve(targets, predictions[:, pos_class], pos_label=pos_class)
         roc_auc = auc(fpr_node, tpr_node)
-        plt.plot(fpr_node,tpr_node,lw=3, label="%s (AUC = %0.3f)" % (classes[pos_class],roc_auc), color=eval(cs[pos_class]))
-
+        plt.plot(fpr_node,tpr_node,lw=3, label="%s (AUC = %0.3f)" % (classes[pos_class],roc_auc), color=eval(cs[i]))
+        i += 1
     plt.plot([0, 1], [0, 1], color="black", lw=1, linestyle="--")
     # plt.xlim([0.0, 1.0])
     # plt.ylim([0.0, 1.0])
