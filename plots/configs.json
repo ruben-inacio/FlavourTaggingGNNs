@@ -1,13 +1,43 @@
 {
-    "results_dir": "../../comparisons_tst0210",
-    "models_2": [
-         "../../final_results_old/gn2_adamw001_batch250", "../../section5_enc/gn2_simple_eye", "../../section5_enc/gn2_random_fixed"
+    "results_dir": "../../comparisons/section5_resuts",
+    "results_dir_ndive": "../../comparisons/section5_enc",
+    "results_dir_enc": "../../comparisons/section5_enc",
+    "models_ndive": [
+        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
+        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive",
+        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_none", 
+        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent"
+    ],
+    "labels_models_ndive": [
+        "GN2", 
+        "GN2+ Naive",
+        "GN2+ Vertex", 
+        "GN2+ Full"
+    ],
+    "models_enc": [
+        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
+        "/sdf/scratch/r/rainacio/section5_enc/gn2_pt",
+        "/sdf/scratch/r/rainacio/section5_enc/gn2_random_fixed_v2",
+        "/sdf/scratch/r/rainacio/section5_enc/gn2_simple_eye"
+
+    ],
+    "labels_models_enc": [
+        "GN2", 
+        "GN2+ $p_T$-based",
+        "GN2+ Random Fixed", 
+        "GN2+ Eye"
     ],
     "models": [
-        "/sdf/scratch/r/rainacio/section5_baseline/gn2", "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_none", "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent" 
+        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
+        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent",
+        "/sdf/scratch/r/rainacio/section5_enc/gn2_simple_eye",
+        "/sdf/scratch/r/rainacio/section5_complete/gn2plus"
     ],
     "labels_models": [
-       "GN2", "GN2+ NDIVE points", "GN2+ NDIVE extrap"
+        "GN2", 
+        "GN2+ No Enc.",
+        "GN2+ No Info.", 
+        "GN2+"
     ],
     "labels_graph": [
         "b", "c", "l"
@@ -23,11 +53,11 @@
         "Other"
     ],
     "colors": [
-        "(255/255, 255/255, 204/255)",
-        "(161/255, 218/255, 180/255)",
-        "(65/255, 182/255, 196/255)",
-        "(44/255, 127/255, 184/255)",
-        "(37/255, 52/255, 148/255)" 
+        "(213/255, 23/255, 78/255)",
+        "(0, 191/255, 1)",
+        "(102/255, 205/255, 170/255)",
+        "(1, 177/255, 109/255)",
+        "(221/255, 133/255, 215/255)"
     ],
     "colors_flavours": [
         "forestgreen", 
@@ -44,8 +74,8 @@
         "(213/255, 23/255, 78/255)",
         "(0, 191/255, 1)",
         "(102/255, 205/255, 170/255)",
-        "(221/255, 133/255, 215/255)",
-        "(1, 177/255, 109/255)"
+        "(1, 177/255, 109/255)",
+        "(221/255, 133/255, 215/255)"
     ],
     "colors_custom_pallete": [
         "(240/255, 249/255, 232/255)",

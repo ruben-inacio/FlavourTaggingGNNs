@@ -5,11 +5,11 @@
         "heads": 2,
         "augment": true,
         "strategy_prediction": "fit",
-        "points_as_features": false,
+        "points_as_features": true,
         "errors_as_features": false,
         "scale": false,
-        "encoding_strategy": null,
-        "propagate_independently": null
+        "encoding_strategy": "simple_eye",
+        "propagate_independently": true
     },
     "predictor": {
         "hidden_channels": 32,

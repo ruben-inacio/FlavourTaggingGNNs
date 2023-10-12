@@ -287,7 +287,7 @@ def warmup_model(batch_size, state, train_dl, valid_dl, save_dir, ensemble_id=0,
         }, indent=4)
         histf.write(r)
 
-    return state, early_stop
+    return state, early_stop, epoch
 
 
 def train_epoch(state, dl, epoch, key, training): 
@@ -510,15 +510,21 @@ if __name__ == "__main__":
     with open("configs_models.json", "r") as f:
             settings = json.load(f)[opt.model]
     for instance_id in range(num_instances, opt.ensemble_size):
-        model = get_model(opt.model, save_dir=save_dir, settings=settings, instance=instance_id)
-        lr = opt.lr
-        print("Instance number:", instance_id)
-        rng, state = init_model(rng, model, optimiser, lr=opt.lr)
-        print(type(model))
-        early_stop = None
-        if lr > .0005 and isinstance(model, TN1):
-            state, early_stop = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr)
-            lr = lr / 10
+        warm_up_success = False
+        ep = 16
+        while not warm_up_success:
+            model = get_model(opt.model, save_dir=save_dir, settings=settings, instance=instance_id)
+            lr = opt.lr
+            print("Instance number:", instance_id)
+            rng, state = init_model(rng, model, optimiser, lr=opt.lr)
+            print(type(model))
+            early_stop = None
+            if lr > .0005 and isinstance(model, TN1):
+                state, early_stop, ep = warmup_model(opt.batch_size, state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr)
+                lr = lr / 10
+
+            warm_up_success = (ep > 15)
+            
         if opt.warmup_only:
             continue
         ckpt = train_model(state, train_dl, valid_dl, save_dir=save_dir, ensemble_id=instance_id, optimiser=optimiser, lr=lr, early_stop=early_stop)

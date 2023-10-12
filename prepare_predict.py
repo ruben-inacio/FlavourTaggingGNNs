@@ -290,7 +290,7 @@ if __name__ == '__main__':
     print("num instances", total)
     start = 0
     for i in range(total):
-        results_exist = sum(x.endswith(f'{i}.npy') for x in os.listdir(save_dir)) > 0
+        results_exist = sum(x.endswith(f'{i}.npz') for x in os.listdir(save_dir)) > 0
         if results_exist:
             start = i+1
         else:

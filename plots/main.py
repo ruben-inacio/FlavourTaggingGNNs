@@ -132,6 +132,7 @@ if __name__ == "__main__":
                 # raise e
             
             try:
+                assert(do_classifications)
                 if old_files:
                     results_nodes_clf = np.load(f"{m}/results_nodes_clf_{run}.npy")
                 else:

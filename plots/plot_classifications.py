@@ -189,11 +189,11 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
         ax[0, 1].fill_between(mean_sig_eff, rej_lower, rej_upper, color=colors[m], alpha=0.2)
         
     ax[0, 0].set_yscale("log")
-    ax[0, 0].set_ylabel("c-jet rejection", loc="top")
+    ax[0, 0].set_ylabel(r"c-jet rejection ($1/\epsilon_c$)", loc="top")
     ax[0, 0].legend(loc="upper right")
     ax[0, 0].set_xlim(0.6, 1)
     ax[0, 1].set_yscale("log")
-    ax[0, 1].set_ylabel("l-jet rejection", loc="top")
+    ax[0, 1].set_ylabel(r"l-jet rejection ($1/\epsilon_l$)", loc="top")
     ax[0, 1].legend(loc="upper right")
     ax[0, 1].set_xlim(0.6, 1)
 
@@ -441,13 +441,13 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
 
                 models_acc.append(model_acc_mean)
             if flav == 0:
-                ax[0].set_ylabel("b-jet tagging efficiency")
+                ax[0].set_ylabel("b-jet efficiency ($\epsilon_b$)")
                 ax[0].set_ylim(0.6, 1)
             elif flav == 1:
-                ax[0].set_ylabel("c-jet tagging rejection")
+                ax[0].set_ylabel(r"c-jet rejection ($1/\epsilon_c$)")
                 ax[0].set_ylim(min_, 1.05 * max_)
             elif flav == 2:
-                ax[0].set_ylabel("l-jet tagging rejection")
+                ax[0].set_ylabel(r"l-jet rejection ($1/\epsilon_l$)")
                 ax[0].set_ylim(min_, 1.05 * max_)
             
             ax[0].set_xlim(jet_min,jet_max)

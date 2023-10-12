@@ -86,6 +86,8 @@ class IDEncoder(nn.Module):
  
     def encode_random_dynamic(self, encoder, x, t, mask, offset, *args, **kwargs):
         identities = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
+        # key = jax.random.PRNGKey(time.time_ns() % 100)
+        # key2 = jax.random.PRNGKey(datetime.datetime.now().second)
         key = jax.random.PRNGKey(self.seed-offset)
         key2 = jax.random.PRNGKey(self.seed+1+offset)
         ids = jax.random.permutation(key, identities, axis=1)
