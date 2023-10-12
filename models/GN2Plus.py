@@ -12,6 +12,7 @@ from models.PreProcessor import PreProcessor
 from models.Predictor import Predictor
 from models.IDEncoder import IDEncoder
 from utils.extrapolation import extrapolation
+import utils.data_format as daf
 
 
 class TN1(nn.Module):
@@ -124,6 +125,30 @@ class TN1(nn.Module):
             points = jax.random.uniform(init_rng, shape=[x.shape[0], 3], minval=r1, maxval=-r1)
             log_errors = jnp.zeros([x.shape[0], 3])
             return None, None, None, points, log_errors, None
+
+    def apply_prediction_relativity(self, x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta):
+        jet_pt = x[:, 0, daf.JetData.TRACK_JET_PT]
+        jet_eta = x[:, 0, daf.JetData.TRACK_JET_ETA]
+
+        # start by calculating absolute displacement
+        jet_theta = 2*jnp.arctan(jnp.exp(-jet_eta))
+        jet_mom = jet_pt*jnp.cosh(jet_eta)
+        b_mom = 0.70 * jet_mom # on average, 70% of the b-quark energy goes into the b-hadron
+        tau = 1.55e-12 # s
+        mass = 5 # GeV
+        c = 3e8 # m/s
+        gamma = jnp.sqrt(1+jnp.square(b_mom/mass))
+        d = gamma * tau * c
+
+        # turn that into a vertex estimate, assuming jet axis direction
+        x = d * jnp.cos(jet_phi) * 1e3 # mm
+        y = d * jnp.sin(jet_phi) * 1e3 # mm
+        z = d * jnp.cos(jet_theta) * 1e3 # mm
+
+        points = jnp.stack([x, y, z], axis=1)
+        log_errors = jnp.zeros([x.shape[0], 3])
+
+        return None, None, None, points, log_errors, None
 
     def apply_prediction_perfect(self, x, mask, true_jet, true_trk, *args):
             assert(true_jet is not None and true_trk is not None)

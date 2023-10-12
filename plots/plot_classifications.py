@@ -259,7 +259,7 @@ def compute_threshold_rej(jet_flavours, discriminator, rejection_threshold=45.0,
         jet_flavours = np.array(jet_flavours)
     if type(discriminator) != np.ndarray:
         discriminator = np.array(discriminator)
-    print(discriminator.shape)
+    # print(discriminator.shape)
 
     cjet = discriminator[jet_flavours==1]
     ujet = discriminator[jet_flavours==2]
@@ -294,7 +294,7 @@ def compute_threshold_eff(jet_flavours, discriminator, working_point):
         jet_flavours = np.array(jet_flavours)
     if type(discriminator) != np.ndarray:
         discriminator = np.array(discriminator)
-    print(discriminator.shape)
+    # print(discriminator.shape)
 
     values = discriminator[jet_flavours == 0]
     n, bins = np.histogram(values, bins=np.linspace(np.min(values),np.max(values),200), density=True)
@@ -396,6 +396,8 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
             models_acc = []
             for m, model_results in enumerate(jet_results):
                 model_acc = []
+                N_b = np.zeros(number_bins)
+                m_b = np.zeros(number_bins)
                 for r, results in enumerate(model_results): # each sample of the model
                     acc = []
                     for b in range(number_bins):
@@ -410,15 +412,18 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
                         # res = results[b][bins_true[b] == 0]
                         # acc.append(len(res[res > D]) / len(res))
                         res = results[b][bins_true[b] == flav]
+                        N_b[b] += len(res)
+                        m_b[b] += len(res[res > D])
                         if flav == 0:
                             acc.append(len(res[res > D]) / len(res))
                         else:
                             acc.append(len(res) / len(res[res > D]))
-
                     model_acc.append(np.array(acc))
-
+                N_b = N_b / len(model_results)
+                m_b = m_b / len(model_results)
                 model_acc_mean_aux = np.mean(np.array(model_acc), axis=0)
-                model_acc_std_aux = np.std(np.array(model_acc), axis=0)
+                model_acc_std_aux = (1 / N_b) * np.sqrt(m_b * (1 - m_b / N_b))
+                print("STD N m", model_acc_std_aux, N_b, m_b, "---", sep='\n')
                 model_acc_mean = []
                 model_acc_std = []
                 for i in range(len(model_acc_mean_aux)):
@@ -428,14 +433,13 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
                     model_acc_std.append(model_acc_std_aux[i])
                 model_acc_mean = np.array(model_acc_mean)
                 model_acc_std = np.array(model_acc_std)
-                print(model_acc_mean)
                 min_ = min(model_acc_mean.min(), min_)
                 max_ = max(model_acc_mean.max(), max_)
                 std_upper = model_acc_mean + model_acc_std
                 std_lower = model_acc_mean - model_acc_std
                 lbl = labels[m]
                 for qq in range(0, len(bins)+1, 2):
-                    ax[0].plot(bins[qq:qq+2], model_acc_mean[qq:qq+2], label=lbl, color=colors[m])
+                    ax[0].plot(bins[qq:qq+2], model_acc_mean[qq:qq+2], label=lbl, color=colors[m], linewidth=3)
                     lbl = "_nolegend_"
                     ax[0].fill_between(bins[qq:qq+2], std_lower[qq:qq+2], std_upper[qq:qq+2], color=colors[m], alpha=0.2)
 
@@ -460,7 +464,7 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
                 ratio = model_acc / baseline_acc
                 lbl = labels[r]
                 for qq in range(0, len(bins)+1, 2):
-                    ax[1].plot(bins[qq:qq+2], ratio[qq:qq+2], color=colors[r], label=lbl)
+                    ax[1].plot(bins[qq:qq+2], ratio[qq:qq+2], color=colors[r], linewidth=3, label=lbl)
                     lbl = "_nolegend_"
 
             ax[1].set_xlabel(var_label)
