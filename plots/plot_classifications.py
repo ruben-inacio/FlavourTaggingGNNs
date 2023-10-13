@@ -39,44 +39,13 @@ def plot_standard_roc(predictions, targets, classes, name, save_dir):
         'size'   : 22}
     plt.rc('font', **font)
     plt.figure(figsize=(7,7))
-    plt.subplots_adjust(left=0.135, right=.985, top=.925, bottom=0.125)
+    plt.subplots_adjust(left=0.14, right=.985, top=.925, bottom=0.125)
 
-
-    # cs = ["(186/255, 228/255, 188/255)",
-    #     "(123/255, 204/255, 196/255)",
-    #     "(67/255, 162/255, 202/255)",
-    #     "(8/255, 104/255, 172/255)"]
-    #     # "(44/255,127/255,184/255)"]
-    # cs = [
-    #     "(161/255, 218/255, 180/255)",
-    #     "(65/255, 182/255, 196/255)",
-    #     "(44/255, 127/255, 184/255)",
-    #     "(37/255, 52/255, 148/255)" 
-    # ]
-    # # cs = [
-    # #     "(7/255, 242/255, 154/255)",
-    # #     "(4/255, 245/255, 223/255)",
-    # #     "(7/255, 200/255, 242/255)",
-    # #     "(7/255, 138/255, 241/255)"
-    # # ]
-    cs = [
-        "(7/255, 242/255, 154/255)",
-        "(186/255, 228/255, 188/255)",
-        "(7/255, 200/255, 242/255)",
-        "(7/255, 138/255, 241/255)"
-    ]
-    if len(classes) == 2:
-        cs = cs[::2]
-    if len(classes) == 4:
-        l = (2, 0, 1, 3)
-    else:
-        l = range(len(classes))
-    i = 0
-    for pos_class in l:
+    for pos_class in range(len(classes)):
         fpr_node, tpr_node, _ = roc_curve(targets, predictions[:, pos_class], pos_label=pos_class)
         roc_auc = auc(fpr_node, tpr_node)
-        plt.plot(fpr_node,tpr_node,lw=3, label="%s (AUC = %0.3f)" % (classes[pos_class],roc_auc), color=eval(cs[i]))
-        i += 1
+        plt.plot(fpr_node,tpr_node,lw=3, label="%s (AUC = %0.3f)" % (classes[pos_class],roc_auc))
+
     plt.plot([0, 1], [0, 1], color="black", lw=1, linestyle="--")
     # plt.xlim([0.0, 1.0])
     # plt.ylim([0.0, 1.0])
@@ -103,7 +72,7 @@ def prepare_ROC_jet_ATLAS_bcujets(pred, true, f=0.05, rej_threshold=100.0):
     valid2 = ( pb != 0 ) & ( np.isfinite(pb) )
     discriminator = np.empty_like(pb)
 
-    discriminator[valid1&valid2] = np.log( np.divide(pb[valid1&valid2],denom[valid1&valid2]))
+    discriminator[valid1&valid2] = np.log(np.divide(pb[valid1&valid2],denom[valid1&valid2]))
     maxval = np.max(discriminator[valid1&valid2])
     minval = np.min(discriminator[valid1&valid2])
 
@@ -147,7 +116,7 @@ def prepare_ROC_jet_ATLAS_bcujets(pred, true, f=0.05, rej_threshold=100.0):
     sig_eff_denom = sig_eff_num.max()
     
     sig_eff = sig_eff_num/sig_eff_denom
-    valid_sig = sig_eff > .2
+    valid_sig = sig_eff > 0.575
     # bkg rejection for charm jets
     cbkg_num = np.cumsum(n_c[::-1])[::-1] 
     cbkg_denom = cbkg_num.max()
@@ -174,8 +143,7 @@ def prepare_ROC_jet_ATLAS_bcujets(pred, true, f=0.05, rej_threshold=100.0):
     return (sig_eff[valid_sig], cbkg_rej[valid_sig], ubkg_rej[valid_sig])
 
 
-
-def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
+def compare_models_jet_ATLAS(jet_results, colors, linestyles, markers, save_dir, labels):
     def find_nearest(array, value):
         array = np.asarray(array)
         idx = (np.abs(array - value)).argmin()
@@ -184,7 +152,8 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
         'size'   : 18}
     plt.rc('font', **font)
     fig, ax = plt.subplots(2, 2 ,figsize=(16,8),gridspec_kw={'height_ratios': [2, 1]})
-
+    markevery = 15
+    lw = 1
     # Upper panel (ROC)
     sig_eff_allmeans = []
     bkg_crej_allmeans = []
@@ -206,8 +175,8 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
             interp_ubkg_rej.append(interp_u(mean_sig_eff))
         mean_cbkg_rej = np.mean(interp_cbkg_rej,axis=0)
         mean_ubkg_rej = np.mean(interp_ubkg_rej,axis=0)
-        ax[0, 0].plot(mean_sig_eff,mean_cbkg_rej,color=colors[m],lw=3, label=labels[m])
-        ax[0, 1].plot(mean_sig_eff,mean_ubkg_rej,color=colors[m],lw=3, label=labels[m])
+        ax[0, 0].plot(mean_sig_eff,mean_cbkg_rej,color=colors[m],lw=lw, markevery=markevery, label=labels[m], linestyle=linestyles[m], marker=markers[m])
+        ax[0, 1].plot(mean_sig_eff,mean_ubkg_rej,color=colors[m],lw=lw, markevery=markevery, label=labels[m], linestyle=linestyles[m], marker=markers[m])
 
         bkg_crej_allmeans.append(mean_cbkg_rej)
         bkg_urej_allmeans.append(mean_ubkg_rej)
@@ -254,13 +223,13 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
         c_ratio_of_rejections = np.ones_like(c_interp_baseline_rej)
         c_ratio_of_rejections = num_cbkg_rej/c_interp_baseline_rej
         # cjet, = ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color='black', lw=2)
-        ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color=colors[r], lw=3)
+        ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color=colors[r], lw=lw, linestyle=linestyles[r], marker=markers[r],markevery=markevery)
 
 
         u_ratio_of_rejections = np.ones_like(u_interp_baseline_rej)
         u_ratio_of_rejections = num_ubkg_rej/u_interp_baseline_rej
         # ujet, = ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color='black', lw=2)
-        ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color=colors[r], lw=3)
+        ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color=colors[r], lw=lw, linestyle=linestyles[r], marker=markers[r],markevery=markevery)
     
         c_rej_70.append(c_ratio_of_rejections[idx_70])
         c_rej_85.append(c_ratio_of_rejections[idx_85])
@@ -374,7 +343,7 @@ def get_discriminator(results):
     return discriminator, pb, pc, pu
 
 
-def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet_true, bins, var, var_label):
+def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir, labels, jet_var, jet_true, bins, var, var_label):
     
     jet_min = jet_var.min().item()
     jet_max = jet_var.max().item()
@@ -476,7 +445,8 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
                 std_lower = model_acc_mean - model_acc_std
                 lbl = labels[m]
                 for qq in range(0, len(bins)+1, 2):
-                    ax[0].plot(bins[qq:qq+2], model_acc_mean[qq:qq+2], label=lbl, color=colors[m], linewidth=3)
+
+                    ax[0].plot(bins[qq:qq+2], model_acc_mean[qq:qq+2], label=lbl, color=colors[m], linewidth=1, linestyle=linestyles[m], marker=markers[m])
                     lbl = "_nolegend_"
                     ax[0].fill_between(bins[qq:qq+2], std_lower[qq:qq+2], std_upper[qq:qq+2], color=colors[m], alpha=0.2)
 
@@ -501,7 +471,7 @@ def compare_models_eff_ATLAS(jet_results, colors, save_dir, labels, jet_var, jet
                 ratio = model_acc / baseline_acc
                 lbl = labels[r]
                 for qq in range(0, len(bins)+1, 2):
-                    ax[1].plot(bins[qq:qq+2], ratio[qq:qq+2], color=colors[r], linewidth=3, label=lbl)
+                    ax[1].plot(bins[qq:qq+2], ratio[qq:qq+2], color=colors[r], linewidth=1, linestyle=linestyles[m], marker=markers[m], label=lbl)
                     lbl = "_nolegend_"
 
             ax[1].set_xlabel(var_label)
@@ -571,6 +541,7 @@ def compare_models_discriminator_ATLAS(jet_results, jet_true, save_dir, labels):
 # High-level functions
 def plot_classifications(predictions, targets, labels, labels_key):
     predictions = np.array(predictions)
+    predictions_ = predictions
     predictions = predictions.mean(axis=1)
     predictions = list(predictions)
     with open("configs.json", "r") as f:
@@ -588,7 +559,8 @@ def plot_classifications(predictions, targets, labels, labels_key):
             print("Confusion matrix not plotted.")
         try:
             plot_standard_roc(predictions[t], targets, labels_clf, clf_type + "_" + labels[t], results_dir)
-        except Exception:
+        except Exception as e:
+            raise e
             print("Standard ROC not plotted.")
 
 
@@ -613,15 +585,20 @@ def performance_cmp_jets(predictions, true_flavours, labels, jet_pts, jet_etas, 
         settings = json.load(f)
         results_dir = settings['results_dir']
         colors = settings['colors']
+        linestyles = settings['linestyles']
+        markers = settings['markers']
         for c in range(len(colors)):
             if colors[c][0] == "(":
                 colors[c] = eval(colors[c])
+        for l in range(len(linestyles)):
+            if linestyles[l][0] == "(":
+                linestyles[l] = eval(linestyles[l])
 
     compare_models_discriminator_ATLAS(predictions, true_flavours, results_dir, labels)
-    compare_models_jet_ATLAS(results, colors, results_dir, labels)
-    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_pts, true_flavours, equal_frequency(jet_pts, 5), "pt", r"Jet $p_{T}$ [GeV]")
-    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, equal_frequency(jet_etas, 5), "eta", r"Jet $\eta$")
-    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_ntracks, true_flavours, equal_frequency(jet_ntracks, 5), "n_tracks", r"#Tracks")
+    compare_models_jet_ATLAS(results, colors, linestyles, markers, results_dir, labels)
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, linestyles, markers, results_dir, labels, jet_pts, true_flavours, equal_frequency(jet_pts, 5), "pt", r"Jet $p_{T}$ [GeV]")
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, linestyles, markers, results_dir, labels, jet_etas, true_flavours, equal_frequency(jet_etas, 5), "eta", r"Jet $\eta$")
+    compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, linestyles, markers, results_dir, labels, jet_ntracks, true_flavours, equal_frequency(jet_ntracks, 5), "n_tracks", r"#Tracks")
     # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_pts, true_flavours, [20, 40, 60, 80, 100, 200], "pt", r"Jet $p_{T}$ [GeV]")
     # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_etas, true_flavours, [-2.5, -1, -.5, 0, .5, 1, 2.5], "eta", r"Jet $\eta$")
     # compare_models_eff_ATLAS(copy.deepcopy(predictions), colors, results_dir, labels, jet_ntracks, true_flavours, [1, 4, 8, 10, 12, 15], "n_tracks", r"#Tracks")
