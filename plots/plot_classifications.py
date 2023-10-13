@@ -35,10 +35,13 @@ def plot_confusion_matrix(predictions, targets, classes, name, save_dir):
 
 
 def plot_standard_roc(predictions, targets, classes, name, save_dir):
-    plt.figure(figsize=(7,7))
     font = {'family' : 'sans-serif',
-        'size'   : 16}
+        'size'   : 22}
     plt.rc('font', **font)
+    plt.figure(figsize=(7,7))
+    plt.subplots_adjust(left=0.135, right=.985, top=.925, bottom=0.125)
+
+
     # cs = ["(186/255, 228/255, 188/255)",
     #     "(123/255, 204/255, 196/255)",
     #     "(67/255, 162/255, 202/255)",
@@ -203,8 +206,8 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
             interp_ubkg_rej.append(interp_u(mean_sig_eff))
         mean_cbkg_rej = np.mean(interp_cbkg_rej,axis=0)
         mean_ubkg_rej = np.mean(interp_ubkg_rej,axis=0)
-        ax[0, 0].plot(mean_sig_eff,mean_cbkg_rej,color=colors[m],lw=2, label=labels[m])
-        ax[0, 1].plot(mean_sig_eff,mean_ubkg_rej,color=colors[m],lw=2, label=labels[m])
+        ax[0, 0].plot(mean_sig_eff,mean_cbkg_rej,color=colors[m],lw=3, label=labels[m])
+        ax[0, 1].plot(mean_sig_eff,mean_ubkg_rej,color=colors[m],lw=3, label=labels[m])
 
         bkg_crej_allmeans.append(mean_cbkg_rej)
         bkg_urej_allmeans.append(mean_ubkg_rej)
@@ -250,14 +253,14 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
         
         c_ratio_of_rejections = np.ones_like(c_interp_baseline_rej)
         c_ratio_of_rejections = num_cbkg_rej/c_interp_baseline_rej
-        cjet, = ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color='black', lw=2)
-        ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color=colors[r], lw=2)
+        # cjet, = ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color='black', lw=2)
+        ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color=colors[r], lw=3)
 
 
         u_ratio_of_rejections = np.ones_like(u_interp_baseline_rej)
         u_ratio_of_rejections = num_ubkg_rej/u_interp_baseline_rej
-        ujet, = ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color='black', lw=2)
-        ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color=colors[r], lw=2)
+        # ujet, = ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color='black', lw=2)
+        ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color=colors[r], lw=3)
     
         c_rej_70.append(c_ratio_of_rejections[idx_70])
         c_rej_85.append(c_ratio_of_rejections[idx_85])
@@ -277,7 +280,7 @@ def compare_models_jet_ATLAS(jet_results, colors, save_dir, labels):
     ax[1, 0].set_ylabel("Ratio to " + labels[0])
     ax[1, 0].set_xlim(.6, 1)
     ax[1, 1].set_xlabel(r"b-jet efficiency ($\epsilon_b$)")
-    ax[1, 1].set_ylabel("Ratio")# to " + labels[0])
+    ax[1, 1].set_ylabel("Ratio to " + labels[0])
     ax[1, 1].set_xlim(.6, 1)
     plt.tight_layout()
     plt.savefig(f"{save_dir}/ATLAS_roc_ensemble_bcu.pdf")

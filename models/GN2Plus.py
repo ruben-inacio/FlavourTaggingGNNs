@@ -79,6 +79,19 @@ class TN1(nn.Module):
                 encoding_strategy=       None,
                 seed= self.seed
             )
+        elif self.strategy_prediction == "fit_perfect":
+            self.apply_strategy_prediction_fn = Predictor(
+                hidden_channels=         32,
+                layers=                  1,
+                heads=                   1,
+                strategy_sampling=       None,
+                strategy_weights=        "perfect", #"perfect",  # "compute",
+                use_ghost_track=         False,
+                activation =             None, #None,  # "softmax",
+                method=                  self.strategy_prediction,
+                encoding_strategy=       None,
+                seed= self.seed
+            )            
         elif self.strategy_prediction is not None:
             self.apply_strategy_prediction_fn = eval("self.apply_prediction_" + self.strategy_prediction)
         else:
