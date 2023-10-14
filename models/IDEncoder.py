@@ -47,6 +47,26 @@ class IDEncoder(nn.Module):
 
         return res
     
+    def encode_eye(self, encoder, x, t, mask, *args, **kwargs):
+        ids = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
+        t_rp = self.get_encodings(t, ids) * mask
+            
+        g = encoder(t_rp, mask=mask)
+
+        return g
+
+    def encode_random(self, encoder, x, t, mask, *args, **kwargs):
+        ids = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
+        key = jax.random.PRNGKey(time.time_ns() % 100)
+        ids = jax.random.permutation(key, ids)
+        
+        t_rp = self.get_encodings(t, ids) * mask
+            
+        g = encoder(t_rp, mask=mask)
+
+        return g
+
+    # Old..
     def encode_simple_eye(self, encoder, x, t, mask, *args, **kwargs):
         ids = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
         ids_rev = jnp.stack([jnp.arange(0, x.shape[1])][::-1] * x.shape[0], axis=0)
