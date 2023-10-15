@@ -152,8 +152,8 @@ def compare_models_jet_ATLAS(jet_results, colors, linestyles, markers, save_dir,
         'size'   : 18}
     plt.rc('font', **font)
     fig, ax = plt.subplots(2, 2 ,figsize=(16,8),gridspec_kw={'height_ratios': [2, 1]})
-    markevery = 15
-    lw = 1
+    # markevery = 25
+    lw = 3
     # Upper panel (ROC)
     sig_eff_allmeans = []
     bkg_crej_allmeans = []
@@ -175,8 +175,8 @@ def compare_models_jet_ATLAS(jet_results, colors, linestyles, markers, save_dir,
             interp_ubkg_rej.append(interp_u(mean_sig_eff))
         mean_cbkg_rej = np.mean(interp_cbkg_rej,axis=0)
         mean_ubkg_rej = np.mean(interp_ubkg_rej,axis=0)
-        ax[0, 0].plot(mean_sig_eff,mean_cbkg_rej,color=colors[m],lw=lw, markevery=markevery, label=labels[m], linestyle=linestyles[m], marker=markers[m])
-        ax[0, 1].plot(mean_sig_eff,mean_ubkg_rej,color=colors[m],lw=lw, markevery=markevery, label=labels[m], linestyle=linestyles[m], marker=markers[m])
+        ax[0, 0].plot(mean_sig_eff,mean_cbkg_rej,color=colors[m],lw=lw, label=labels[m], linestyle=linestyles[m])
+        ax[0, 1].plot(mean_sig_eff,mean_ubkg_rej,color=colors[m],lw=lw, label=labels[m], linestyle=linestyles[m])
 
         bkg_crej_allmeans.append(mean_cbkg_rej)
         bkg_urej_allmeans.append(mean_ubkg_rej)
@@ -196,11 +196,12 @@ def compare_models_jet_ATLAS(jet_results, colors, linestyles, markers, save_dir,
         
     ax[0, 0].set_yscale("log")
     ax[0, 0].set_ylabel(r"c-jet rejection ($1/\epsilon_c$)", loc="top")
-    ax[0, 0].legend(loc="upper right")
+    ax[0, 0].legend(loc="lower left", handlelength=3)
+    # ax[0, 0].legend(loc="upper right", handlelength=3)
     ax[0, 0].set_xlim(0.6, 1)
     ax[0, 1].set_yscale("log")
     ax[0, 1].set_ylabel(r"l-jet rejection ($1/\epsilon_l$)", loc="top")
-    ax[0, 1].legend(loc="upper right")
+    ax[0, 1].legend(loc="lower left", handlelength=3)
     ax[0, 1].set_xlim(0.6, 1)
 
     # Ratio panel
@@ -223,13 +224,13 @@ def compare_models_jet_ATLAS(jet_results, colors, linestyles, markers, save_dir,
         c_ratio_of_rejections = np.ones_like(c_interp_baseline_rej)
         c_ratio_of_rejections = num_cbkg_rej/c_interp_baseline_rej
         # cjet, = ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color='black', lw=2)
-        ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color=colors[r], lw=lw, linestyle=linestyles[r], marker=markers[r],markevery=markevery)
+        ax[1, 0].plot(num_sig_eff,c_ratio_of_rejections, color=colors[r], lw=lw, linestyle=linestyles[r])
 
 
         u_ratio_of_rejections = np.ones_like(u_interp_baseline_rej)
         u_ratio_of_rejections = num_ubkg_rej/u_interp_baseline_rej
         # ujet, = ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color='black', lw=2)
-        ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color=colors[r], lw=lw, linestyle=linestyles[r], marker=markers[r],markevery=markevery)
+        ax[1, 1].plot(num_sig_eff,u_ratio_of_rejections, color=colors[r], lw=lw, linestyle=linestyles[r])
     
         c_rej_70.append(c_ratio_of_rejections[idx_70])
         c_rej_85.append(c_ratio_of_rejections[idx_85])
@@ -419,7 +420,7 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
                         # acc.append(len(res[res > D]) / len(res))
                         res = results[b][bins_true[b] == flav]
                         N_b[b] += len(res)
-                        m_b[b] += len(res[res > D])
+                        m_b[b] += len(res[res <= D])
                         if flav == 0:
                             acc.append(len(res[res > D]) / len(res))
                         else:
@@ -446,7 +447,10 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
                 lbl = labels[m]
                 for qq in range(0, len(bins)+1, 2):
 
-                    ax[0].plot(bins[qq:qq+2], model_acc_mean[qq:qq+2], label=lbl, color=colors[m], linewidth=1, linestyle=linestyles[m], marker=markers[m])
+                    ax[0].scatter(0,  -10, marker=markers[m], color=colors[m], label=lbl)
+                    ax[0].plot(bins[qq:qq+2], model_acc_mean[qq:qq+2], color=colors[m], linewidth=1)
+                    if qq < len(bins):
+                        ax[0].scatter(bins[qq]+ 0.5*(bins[qq+1] - bins[qq]), model_acc_mean[qq],marker=markers[m], s=50, color=colors[m])
                     lbl = "_nolegend_"
                     ax[0].fill_between(bins[qq:qq+2], std_lower[qq:qq+2], std_upper[qq:qq+2], color=colors[m], alpha=0.2)
 
@@ -462,7 +466,7 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
                 ax[0].set_ylim(min_, 1.05 * max_)
             
             ax[0].set_xlim(jet_min,jet_max)
-            ax[0].legend(loc="lower right")
+            ax[0].legend(loc="lower right" if var != "eta" else "lower center", handlelength=1)
 
             # Ratio panel (denominator is always first model)
             baseline_acc = models_acc[0]    
@@ -471,7 +475,9 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
                 ratio = model_acc / baseline_acc
                 lbl = labels[r]
                 for qq in range(0, len(bins)+1, 2):
-                    ax[1].plot(bins[qq:qq+2], ratio[qq:qq+2], color=colors[r], linewidth=1, linestyle=linestyles[m], marker=markers[m], label=lbl)
+                    ax[1].plot(bins[qq:qq+2], ratio[qq:qq+2], color=colors[r], linewidth=1)
+                    if qq < len(bins):
+                        ax[1].scatter(bins[qq]+ 0.5*(bins[qq+1] - bins[qq]), ratio[qq], marker=markers[r], s=50, color=colors[r])
                     lbl = "_nolegend_"
 
             ax[1].set_xlabel(var_label)
@@ -513,11 +519,11 @@ def compare_models_discriminator_ATLAS(jet_results, jet_true, save_dir, labels):
     color_c = (255/255, 215/255, 0, 1.0) # "#FFD700 ".lower() # 'gold'
     color_u = (100/255, 149/255, 237/255, 1.0) # "#6495ED".lower() # 'dodgerblue'
     for t in range(1, len(jet_results)):
-        fig = plt.figure(figsize=(6, 4), dpi=100)
+        fig = plt.figure(figsize=(10, 6))
         ax = fig.add_subplot(111)
 
         fc = 0.05
-        bins = np.linspace(-5,8,50)
+        bins = np.linspace(-8,10,250)
 
         ax.hist(discriminators_u[0], bins=bins, histtype='step', color=color_u, label='l-jets '+labels[0], linestyle='-', linewidth=5, density=True)
         ax.hist(discriminators_c[0], bins=bins, histtype='step', color=color_c, label='c-jets '+labels[0], linestyle='-', linewidth=5, density=True)
@@ -527,7 +533,8 @@ def compare_models_discriminator_ATLAS(jet_results, jet_true, save_dir, labels):
         ax.hist(discriminators_c[t], bins=bins, histtype='step', color=color_c, label='c-jets '+labels[t], linestyle=':', linewidth=5, density=True)
         ax.hist(discriminators_b[t], bins=bins, histtype='step', color=color_b, label='b-jets '+labels[t], linestyle=':', linewidth=5, density=True)
 
-        ax.legend(bbox_to_anchor=(1.0, 1.03), loc="upper left")
+        ax.legend(loc="upper left")
+        # ax.legend(bbox_to_anchor=(1.0, 1.03), loc="upper left")
 
         ax.set_xlabel('$D_b$')
         ax.set_ylabel('Arbitrary Units')
