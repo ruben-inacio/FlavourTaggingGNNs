@@ -345,7 +345,9 @@ def get_discriminator(results):
 
 
 def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir, labels, jet_var, jet_true, bins, var, var_label):
-    
+    font = {'family' : 'sans-serif',
+        'size'   : 20}
+    plt.rc('font', **font)
     jet_min = jet_var.min().item()
     jet_max = jet_var.max().item()
 
@@ -490,6 +492,7 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
             plt.savefig(f"{save_dir}/ATLAS_eff_ensemble_flav{flav}_{var}_{wp}.pdf")
 
             plt.close()
+    reset_font()
     return 
 
 

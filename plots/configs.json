@@ -1,6 +1,20 @@
 {
-    "results_dir": "../../comparisons/section5_resuts_v3_2",
-    "results_dir_ndive": "../../comparisons/section5_enc",
+    "results_dir": "../../comparisons/section5_ndive",
+     "models": [
+        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
+        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive",
+        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_none", 
+        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent"
+    ],
+    "labels_models": [
+        "GN2", 
+        "GN2+ Naive",
+        "GN2+ Vertex", 
+        "GN2+ Full"
+    ],   
+    
+    "results_dir_final": "../../comparisons/section5_resuts",    
+    "results_dir_ndive": "../../comparisons/section5_ndive",
     "results_dir_enc": "../../comparisons/section5_enc",
     "models_ndive": [
         "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
@@ -23,18 +37,24 @@
     ],
     "labels_models_enc": [
         "GN2", 
-        "GN2+ $p_T$-based",
-        "GN2+ Random Fixed", 
+        "GN2+ Momenta",
+        "GN2+ Random", 
         "GN2+ Eye"
     ],
-    "models": [
-        "../../models_slac/gn2", "../../models_slac/gn2_ndive", "../../models_slac/gn2_ndive_augm_independent", "../../models/1410encs"
+    "models_final": [
+        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
+        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent",
+        "/sdf/scratch/r/rainacio/section5_enc/gn2_simple_eye",
+        "/sdf/scratch/r/rainacio/section5_complete/gn2plus"
     ],
-    "labels_models": [
+    "labels_models_final": [
         "GN2", 
-        "GN2+ ndive.",
-        "GN2+ aug", 
+        "GN2+ No Enc",
+        "GN2+ No Info", 
         "GN2+"
+    ],
+    "models_dummy": [
+        "../../models_slac/gn2", "../../models_slac/gn2_ndive", "../../models_slac/gn2_ndive_augm_independent", "../../models/1410encs"
     ],
     "labels_graph": [
         "b", "c", "l"
@@ -72,7 +92,7 @@
         "gold", 
         "dodgerblue"
     ],
-    "ground_truth": "../../ground_truth_final",
+    "ground_truth": "../../ground_truth",
     "ground_truth_rachel": "../../DifferentiableVertexingProject",
     "ground_truth_original": ["../../ground_truth_1407", "ground_truth_2608"],
     "ndive_path": [
