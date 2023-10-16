@@ -1,5 +1,5 @@
 {
-    "results_dir": "../../comparisons/section5_resuts",
+    "results_dir": "../../comparisons/section5_resuts_v3_2",
     "results_dir_ndive": "../../comparisons/section5_enc",
     "results_dir_enc": "../../comparisons/section5_enc",
     "models_ndive": [
@@ -28,15 +28,12 @@
         "GN2+ Eye"
     ],
     "models": [
-        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
-        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent",
-        "/sdf/scratch/r/rainacio/section5_enc/gn2_simple_eye",
-        "/sdf/scratch/r/rainacio/section5_complete/gn2plus"
+        "../../models_slac/gn2", "../../models_slac/gn2_ndive", "../../models_slac/gn2_ndive_augm_independent", "../../models/1410encs"
     ],
     "labels_models": [
         "GN2", 
-        "GN2+ No Enc.",
-        "GN2+ No Info.", 
+        "GN2+ ndive.",
+        "GN2+ aug", 
         "GN2+"
     ],
     "labels_graph": [
@@ -53,18 +50,29 @@
         "Other"
     ],
     "colors": [
-        "(213/255, 23/255, 78/255)",
-        "(0, 191/255, 1)",
-        "(102/255, 205/255, 170/255)",
-        "(1, 177/255, 109/255)",
-        "(221/255, 133/255, 215/255)"
+        "(255/255, 165/255, 0)",
+        "(242/255, 56/255, 90/255)",
+        "(81/255, 10/255, 201/255)",
+        "(0, 161/255, 224/255)"
+    ],
+    "linestyles": [
+        "dashdot",
+        "dotted",
+        "dashed",
+        "solid"
+    ],
+    "markers": [
+        "o",
+        "s",
+        "^",
+        "v"
     ],
     "colors_flavours": [
         "forestgreen", 
         "gold", 
         "dodgerblue"
     ],
-    "ground_truth": "../../ground_truth",
+    "ground_truth": "../../ground_truth_final",
     "ground_truth_rachel": "../../DifferentiableVertexingProject",
     "ground_truth_original": ["../../ground_truth_1407", "ground_truth_2608"],
     "ndive_path": [
