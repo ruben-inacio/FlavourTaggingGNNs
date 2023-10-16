@@ -1,0 +1,85 @@
+{
+    "results_dir": "../../comparisons/section5_enc",
+     "models": [
+        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
+        "/sdf/scratch/r/rainacio/section5_enc/gn2_pt",
+        "/sdf/scratch/r/rainacio/section5_enc/gn2_random_fixed_v2",
+        "/sdf/scratch/r/rainacio/section5_enc/gn2_simple_eye"
+    ],
+    "labels_models": [
+        "GN2", 
+        "GN2+ Momenta",
+        "GN2+ Random", 
+        "GN2+ Eye"
+    ],   
+    "limits_bins_70_c": [
+        0,
+        1
+    ],
+    "limits_bins_70_c_ratio": [
+        0,
+        1
+    ],
+    "limits_bins_70_l": [
+        0,
+        1
+    ],
+    "limits_bins_70_l_ratio": [
+        0,
+        1
+    ],
+    "limits_bins_85_c": [
+        0,
+        1
+    ],
+    "limits_bins_85_c_ratio": [
+        0,
+        1
+    ],
+    "limits_bins_85_l": [
+        0,
+        1
+    ],
+    "limits_bins_85_l_ratio": [
+        0,
+        1
+    ],
+    
+    "labels_graph": [
+        "b", "c", "l"
+    ],
+    "labels_edges": [
+        "Common",
+        "Distinct"
+    ],
+    "labels_nodes":[
+        "FromB",
+        "FromC",
+        "Primary",
+        "Other"
+    ],
+    "colors": [
+        "(255/255, 165/255, 0)",
+        "(242/255, 56/255, 90/255)",
+        "(81/255, 10/255, 201/255)",
+        "(0, 161/255, 224/255)"
+    ],
+    "linestyles": [
+        "dashdot",
+        "dotted",
+        "dashed",
+        "solid"
+    ],
+    "markers": [
+        "o",
+        "s",
+        "^",
+        "v"
+    ],
+    "colors_flavours": [
+        "forestgreen", 
+        "gold", 
+        "dodgerblue"
+    ],
+    "ground_truth": "../../ground_truth"
+}

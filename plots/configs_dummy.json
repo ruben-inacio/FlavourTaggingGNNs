@@ -1,0 +1,85 @@
+{
+    "results_dir": "../../comparisons/test",
+     "models": [
+        "../../models_slac/gn2", 
+        "../../models_slac/gn2_ndive",
+        "../../models_slac/gn2_ndive_augm_none", 
+        "../../models/1410encs"
+    ],
+    "labels_models": [
+        "GN2 dummy1", 
+        "GN2+ dummy2",
+        "GN2+ dummy3", 
+        "GN2+ dummy4"
+    ],   
+    "limits_bins_70_c": [
+        0,
+        1
+    ],
+    "limits_bins_70_c_ratio": [
+        0,
+        1
+    ],
+    "limits_bins_70_l": [
+        0,
+        1
+    ],
+    "limits_bins_70_l_ratio": [
+        0,
+        1
+    ],
+    "limits_bins_85_c": [
+        0,
+        1
+    ],
+    "limits_bins_85_c_ratio": [
+        0,
+        1
+    ],
+    "limits_bins_85_l": [
+        0,
+        1
+    ],
+    "limits_bins_85_l_ratio": [
+        0,
+        1
+    ],
+    
+    "labels_graph": [
+        "b", "c", "l"
+    ],
+    "labels_edges": [
+        "Common",
+        "Distinct"
+    ],
+    "labels_nodes":[
+        "FromB",
+        "FromC",
+        "Primary",
+        "Other"
+    ],
+    "colors": [
+        "(255/255, 165/255, 0)",
+        "(242/255, 56/255, 90/255)",
+        "(81/255, 10/255, 201/255)",
+        "(0, 161/255, 224/255)"
+    ],
+    "linestyles": [
+        "dashdot",
+        "dotted",
+        "dashed",
+        "solid"
+    ],
+    "markers": [
+        "o",
+        "s",
+        "^",
+        "v"
+    ],
+    "colors_flavours": [
+        "forestgreen", 
+        "gold", 
+        "dodgerblue"
+    ],
+    "ground_truth": "../../ground_truth_final"
+}

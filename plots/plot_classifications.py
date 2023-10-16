@@ -486,6 +486,12 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
             ax[1].set_ylabel("Ratio to " + labels[0])
             ax[1].set_xlim(jet_min,jet_max)
             # ax[1].legend(loc="best")
+            if flav > 0:
+                flag = "c" if flav == 1 else "l"
+                with open("configs.json", "r") as f:
+                    settings = json.load(f)
+                    ax[0].set_ylim(*settings[f'limits_bins_{100*wp}_{flag}'])
+                    ax[1].set_ylim(*settings[f'limits_bins_{100*wp}_{flag}_ratio'])
             plt.tight_layout()
 
 

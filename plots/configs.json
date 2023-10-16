@@ -12,6 +12,38 @@
         "GN2+ Vertex", 
         "GN2+ Full"
     ],   
+    "limits_bins_70_c": [
+        0,
+        1
+    ],
+    "limits_bins_70_c_ratio": [
+        0,
+        1
+    ],
+    "limits_bins_70_l": [
+        0,
+        1
+    ],
+    "limits_bins_70_l_ratio": [
+        0,
+        1
+    ],
+    "limits_bins_85_c": [
+        0,
+        1
+    ],
+    "limits_bins_85_c_ratio": [
+        0,
+        1
+    ],
+    "limits_bins_85_l": [
+        0,
+        1
+    ],
+    "limits_bins_85_l_ratio": [
+        0,
+        1
+    ],
     
     "results_dir_final": "../../comparisons/section5_resuts",    
     "results_dir_ndive": "../../comparisons/section5_ndive",
