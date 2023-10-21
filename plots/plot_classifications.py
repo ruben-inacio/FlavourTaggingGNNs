@@ -450,9 +450,9 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
                 for qq in range(0, len(bins)+1, 2):
 
                     ax[0].scatter(0,  -10, marker=markers[m], color=colors[m], label=lbl)
-                    ax[0].plot(bins[qq:qq+2], model_acc_mean[qq:qq+2], color=colors[m], linewidth=1)
+                    ax[0].plot(bins[qq:qq+2], model_acc_mean[qq:qq+2], color=colors[m], linewidth=2)
                     if qq < len(bins):
-                        ax[0].scatter(bins[qq]+ 0.5*(bins[qq+1] - bins[qq]), model_acc_mean[qq],marker=markers[m], s=50, color=colors[m])
+                        ax[0].scatter(bins[qq]+ 0.5*(bins[qq+1] - bins[qq]), model_acc_mean[qq],marker=markers[m], s=100, color=colors[m])
                     lbl = "_nolegend_"
                     ax[0].fill_between(bins[qq:qq+2], std_lower[qq:qq+2], std_upper[qq:qq+2], color=colors[m], alpha=0.2)
 
@@ -468,7 +468,8 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
                 ax[0].set_ylim(min_, 1.05 * max_)
             
             ax[0].set_xlim(jet_min,jet_max)
-            ax[0].legend(loc="lower right" if var != "eta" else "lower center", handlelength=1)
+            ax[0].legend(loc="lower right" if var != "eta" else "best", handlelength=1, markerscale=2)
+            # ax[0].legend(loc="lower right" if var != "eta" else "lower center", handlelength=1)
 
             # Ratio panel (denominator is always first model)
             baseline_acc = models_acc[0]    
@@ -477,9 +478,9 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
                 ratio = model_acc / baseline_acc
                 lbl = labels[r]
                 for qq in range(0, len(bins)+1, 2):
-                    ax[1].plot(bins[qq:qq+2], ratio[qq:qq+2], color=colors[r], linewidth=1)
+                    ax[1].plot(bins[qq:qq+2], ratio[qq:qq+2], color=colors[r], linewidth=2)
                     if qq < len(bins):
-                        ax[1].scatter(bins[qq]+ 0.5*(bins[qq+1] - bins[qq]), ratio[qq], marker=markers[r], s=50, color=colors[r])
+                        ax[1].scatter(bins[qq]+ 0.5*(bins[qq+1] - bins[qq]), ratio[qq], marker=markers[r], s=100, color=colors[r])
                     lbl = "_nolegend_"
 
             ax[1].set_xlabel(var_label)
@@ -490,8 +491,11 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
                 flag = "c" if flav == 1 else "l"
                 with open("configs.json", "r") as f:
                     settings = json.load(f)
-                    ax[0].set_ylim(*settings[f'limits_bins_{100*wp}_{flag}'])
-                    ax[1].set_ylim(*settings[f'limits_bins_{100*wp}_{flag}_ratio'])
+                    if settings[f'limits_bins_{int(100*wp)}_{flag}'] == [0, 1]:
+                        pass
+                    else:
+                        ax[0].set_ylim(*settings[f'limits_bins_{int(100*wp)}_{flag}'])
+                        ax[1].set_ylim(*settings[f'limits_bins_{int(100*wp)}_{flag}_ratio'])
             plt.tight_layout()
 
 
@@ -504,7 +508,7 @@ def compare_models_eff_ATLAS(jet_results, colors, linestyles, markers, save_dir,
 
 def compare_models_discriminator_ATLAS(jet_results, jet_true, save_dir, labels):
     font = {'family' : 'sans-serif',
-        'size'   : 14}
+        'size'   : 18}
     plt.rc('font', **font)
     discriminators_b = []
     discriminators_c = []
@@ -528,24 +532,24 @@ def compare_models_discriminator_ATLAS(jet_results, jet_true, save_dir, labels):
     color_c = (255/255, 215/255, 0, 1.0) # "#FFD700 ".lower() # 'gold'
     color_u = (100/255, 149/255, 237/255, 1.0) # "#6495ED".lower() # 'dodgerblue'
     for t in range(1, len(jet_results)):
-        fig = plt.figure(figsize=(10, 6))
+        fig = plt.figure(figsize=(12, 6))
         ax = fig.add_subplot(111)
 
         fc = 0.05
         bins = np.linspace(-8,10,250)
 
-        ax.hist(discriminators_u[0], bins=bins, histtype='step', color=color_u, label='l-jets '+labels[0], linestyle='-', linewidth=5, density=True)
-        ax.hist(discriminators_c[0], bins=bins, histtype='step', color=color_c, label='c-jets '+labels[0], linestyle='-', linewidth=5, density=True)
-        ax.hist(discriminators_b[0], bins=bins, histtype='step', color=color_b, label='b-jets '+labels[0], linestyle='-', linewidth=5, density=True)
+        ax.hist(discriminators_u[0], bins=bins, histtype='step', color=color_u, label='l-jets '+labels[0], linestyle=':', linewidth=3, density=True)
+        ax.hist(discriminators_c[0], bins=bins, histtype='step', color=color_c, label='c-jets '+labels[0], linestyle=':', linewidth=3, density=True)
+        ax.hist(discriminators_b[0], bins=bins, histtype='step', color=color_b, label='b-jets '+labels[0], linestyle=':', linewidth=3, density=True)
 
-        ax.hist(discriminators_u[t], bins=bins, histtype='step', color=color_u, label='l-jets '+labels[t], linestyle=':', linewidth=5, density=True)
-        ax.hist(discriminators_c[t], bins=bins, histtype='step', color=color_c, label='c-jets '+labels[t], linestyle=':', linewidth=5, density=True)
-        ax.hist(discriminators_b[t], bins=bins, histtype='step', color=color_b, label='b-jets '+labels[t], linestyle=':', linewidth=5, density=True)
+        ax.hist(discriminators_u[t], bins=bins, histtype='step', color=color_u, label='l-jets '+labels[t], linestyle='-', linewidth=3, density=True)
+        ax.hist(discriminators_c[t], bins=bins, histtype='step', color=color_c, label='c-jets '+labels[t], linestyle='-', linewidth=3, density=True)
+        ax.hist(discriminators_b[t], bins=bins, histtype='step', color=color_b, label='b-jets '+labels[t], linestyle='-', linewidth=3, density=True)
 
-        ax.legend(loc="upper left")
+        ax.legend(loc="best")
         # ax.legend(bbox_to_anchor=(1.0, 1.03), loc="upper left")
 
-        ax.set_xlabel('$D_b$')
+        ax.set_xlabel('b-tagging discriminant ($D_b$)')
         ax.set_ylabel('Arbitrary Units')
         ax.set_yscale("log")
         plt.tight_layout()

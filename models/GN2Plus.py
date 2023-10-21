@@ -27,6 +27,8 @@ class TN1(nn.Module):
     encoding_strategy:   str
     propagate_independently: bool
     seed: int
+    weights_as_features: bool = False
+
 
     def debug_print(*args):
         for arg in args:
@@ -66,11 +68,24 @@ class TN1(nn.Module):
             self.scaler = None
             self.scale_fn = lambda x: x
 
-        if self.strategy_prediction in ("fit", "regression"):
+        if self.strategy_prediction == "fit":
             self.apply_strategy_prediction_fn = Predictor(
                 hidden_channels=         32,
                 layers=                  1,
                 heads=                   1,
+                strategy_sampling=       None,
+                strategy_weights=        "compute", #"perfect",  # "compute",
+                use_ghost_track=         False,
+                activation =             "softmax", #None,  # "softmax",
+                method=                  self.strategy_prediction,
+                encoding_strategy=       None,
+                seed= self.seed
+            )
+        elif self.strategy_prediction == "regression":
+            self.apply_strategy_prediction_fn = Predictor(
+                hidden_channels=         64,
+                layers=                  3,
+                heads=                   8,
                 strategy_sampling=       None,
                 strategy_weights=        "compute", #"perfect",  # "compute",
                 use_ghost_track=         False,
@@ -95,7 +110,7 @@ class TN1(nn.Module):
         elif self.strategy_prediction is not None:
             self.apply_strategy_prediction_fn = eval("self.apply_prediction_" + self.strategy_prediction)
         else:
-            self.apply_strategy_prediction_fn = lambda *args: (None, None, None, None, None, None)
+            self.apply_strategy_prediction_fn = lambda *args: (None, None, None, None, None, None, None)
         
         # Classifier Module containing the output MLPs
 
@@ -169,7 +184,7 @@ class TN1(nn.Module):
             log_errors = jnp.zeros([x.shape[0], 3]) 
             return None, None, None, points, log_errors, None
     
-    def add_reference(self, x, mask, new_ref, new_ref_errors):
+    def add_reference(self, x, mask, new_ref, new_ref_errors, w):
         batch_size, n_tracks, _ = x.shape
 
         if self.propagate_independently is None:
@@ -179,6 +194,8 @@ class TN1(nn.Module):
             x_errors = jnp.repeat(new_ref_errors, n_tracks, axis=0).reshape(batch_size, n_tracks, 3)
             
             x = jnp.concatenate([x, x_points], axis=2)
+            if self.weights_as_features:
+                x = jnp.concatenate([x, w], axis=2)
             x = self.scale_fn(x)
 
             t, g = self.preprocessor(x, mask)
@@ -187,7 +204,7 @@ class TN1(nn.Module):
         x_prime = self.extrapolator(x, jax.lax.stop_gradient(new_ref))
         x_prime = x_prime * mask    
         if self.points_as_features:
-            x = jnp.concatenate([x, jnp.zeros(shape=(batch_size, n_tracks, 3))], axis=2)
+            x = jnp.concatenate([x, jnp.zeros(shape=(batch_size, n_tracks, 3))], axis=2)                
             x_prime = x_prime * mask
             if new_ref_errors.ndim == 3:
                 new_ref_errors = jax.lax.map(jnp.diag, new_ref_errors)
@@ -199,6 +216,9 @@ class TN1(nn.Module):
             if self.errors_as_features:
                 x = jnp.concatenate([x, jnp.zeros(shape=(batch_size, n_tracks, 3))], axis=2)
                 x_prime = jnp.concatenate([x_prime, x_errors], axis=2)
+        if self.weights_as_features:
+            x = jnp.concatenate([x, jnp.zeros(shape=(batch_size, n_tracks, 1))], axis=2)
+            x_prime = jnp.concatenate([x_prime, w], axis=2)
 
         x = self.scale_fn(x)
         x_prime = self.scale_fn(x_prime)
@@ -243,9 +263,9 @@ class TN1(nn.Module):
         # else:
         #     out_preds = jax.lax.stop_gradient(self.apply_strategy_prediction_fn(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta))
         
-        _, _, _, out_mean, out_var, out_chi = out_preds
+        _, _, _, out_mean, out_var, out_chi, w = out_preds
         if out_mean is not None and self.augment:
-            repr_track = self.propagate_fn(x, mask, out_mean, out_var)
+            repr_track = self.propagate_fn(x, mask, out_mean, out_var, w)
         else:
             repr_track = self.propagate_fn(x, mask, offset)
             
@@ -297,8 +317,11 @@ class TN1(nn.Module):
         loss_edges = jnp.mean(loss_edges, where=mask_edges)
 
         if out_mean is not None: 
-            loss_predictor = jnp.abs(batch['jet_vtx'] - out_mean)
-            loss_predictor = jnp.mean(loss_predictor)
+            if out_chi is not None:
+                loss_predictor = jnp.abs(batch['jet_vtx'] - out_mean)
+                loss_predictor = jnp.mean(loss_predictor)
+            else:
+                loss_predictor = squared_error(batch['jet_vtx'], out_mean)
         else:
             loss_predictor = 0
         loss = loss_graph + 0.5 * loss_nodes + 1.5 * loss_edges + 0.1 * loss_predictor
