@@ -164,7 +164,7 @@ class Predictor(nn.Module):
             out_chi = jax.lax.stop_gradient(out_chi)
 
         # weights = weights[:, return_idx]
-        return None, None, None, out_mean, out_var, out_chi
+        return None, None, None, out_mean, out_var, out_chi, weights
 
     def loss(self, out, batch, mask, mask_edges):
         _, _, _, out_mean, out_var, out_chi = out

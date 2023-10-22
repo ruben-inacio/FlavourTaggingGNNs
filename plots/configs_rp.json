@@ -2,47 +2,47 @@
     "results_dir": "../../comparisons/section5_enc",
      "models": [
         "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
-        "/sdf/scratch/r/rainacio/section5_enc/gn2_pt",
-        "/sdf/scratch/r/rainacio/section5_enc/gn2_random_fixed_v2",
-        "/sdf/scratch/r/rainacio/section5_enc/gn2_simple_eye"
+        "/sdf/scratch/r/rainacio/section5_enc_v2/gn2_pt_simpl",
+        "/sdf/scratch/r/rainacio/section5_enc_v2/gn2_eye",
+        "/sdf/scratch/r/rainacio/section5_enc_v2/gn2_random"
     ],
     "labels_models": [
         "GN2", 
         "GN2+ Momenta",
-        "GN2+ Random", 
-        "GN2+ Eye"
+        "GN2+ Eye", 
+        "GN2+ Random"
     ],   
     "limits_bins_70_c": [
-        0,
-        1
+        1,
+        8.5
     ],
     "limits_bins_70_c_ratio": [
-        0,
-        1
+        0.95,
+        1.35
     ],
     "limits_bins_70_l": [
         0,
-        1
+        500
     ],
     "limits_bins_70_l_ratio": [
-        0,
-        1
+        0.95,
+        2.52
     ],
     "limits_bins_85_c": [
-        0,
-        1
+        1,
+        4
     ],
     "limits_bins_85_c_ratio": [
-        0,
-        1
+        0.95,
+        1.35
     ],
     "limits_bins_85_l": [
         0,
-        1
+        140
     ],
     "limits_bins_85_l_ratio": [
-        0,
-        1
+        0.95,
+        3
     ],
     
     "labels_graph": [

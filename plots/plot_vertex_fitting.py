@@ -269,6 +269,9 @@ def plot_global_performance(predictions, errors, true_vtx, true_graph, jet_var, 
     with open("configs.json", "r") as f:
         settings = json.load(f)
         colors = settings['colors']
+        for c in range(len(colors)):
+            if colors[c][0] == "(":
+                colors[c] = eval(colors[c])
         results_dir = settings['results_dir'] + "/" + var_dir
 
     plot_bins(
@@ -356,12 +359,14 @@ def plot_fitting_average(predictions, errors, true_vtx, true_graph, jet_var, lab
 
 
 
-
 def plot_discriminated_by_flavour(predictions, errors, true_vtx, true_graph, jet_var, jet_var_label, labels, var_dir, bins):
     with open("configs.json", "r") as f:
         settings = json.load(f)
         results_dir = settings['results_dir'] + "/" + var_dir
         colors = settings['colors_flavours']
+        for c in range(len(colors)):
+            if colors[c][0] == "(":
+                colors[c] = eval(colors[c])
         labels_flav= settings['labels_graph']
 
     flavour_set = np.unique(true_graph)

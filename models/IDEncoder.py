@@ -74,6 +74,33 @@ class IDEncoder(nn.Module):
         g = encoder(t_rp, mask=mask)
 
         return g
+
+    def encode_sd0_simpl(self, encoder, x, t, mask, *args, **kwargs):
+        ids = self.get_encodings_feature(x, t, mask, decreasing=True, var_id=14)
+
+        t_rp = ids * mask # self.get_encodings(t, ids) * mask
+
+        g = encoder(t_rp, mask=mask)
+
+        return g
+    
+    def encode_random_2(self, encoder, x, t, mask, offset, *args, **kwargs):
+        identities = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
+        identities2 = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)
+        dt = time.time_ns()
+        key = jax.random.PRNGKey(dt % 103)
+        key2 = jax.random.PRNGKey(dt % 107)
+        ids = jax.random.permutation(key, identities, axis=1)
+        ids2 = jax.random.permutation(key2, identities2, axis=1)
+
+        t_rp = self.get_encodings(t, ids2) * mask
+        t_rp_inv = self.get_encodings(t, ids) * mask
+
+        g = encoder(t_rp, mask=mask)
+        g_inv = encoder(t_rp_inv, mask=mask)
+
+        return 0.5 * (g + g_inv)
+    
     # Old..
     def encode_simple_eye(self, encoder, x, t, mask, *args, **kwargs):
         ids = jnp.stack([jnp.arange(0, x.shape[1])] * x.shape[0], axis=0)

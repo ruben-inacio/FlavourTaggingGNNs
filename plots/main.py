@@ -88,6 +88,9 @@ if __name__ == "__main__":
                     results_fitting = np.load(f"{m}/results_graph_reg_{run}.npy")
                 else:
                     results_fitting = results_model_run['results_graph_reg']
+       
+                if results_fitting.ndim == 4:
+                    results_fitting = results_fitting.reshape(-1, 3)
 
                 assert(results_fitting.ndim == 2 and results_fitting.shape[1] == 3)
                 assert(results_fitting.shape[0] == true_graph.shape[0])
@@ -97,6 +100,8 @@ if __name__ == "__main__":
                 else:
                     results_errors = results_model_run['results_graph_reg_var']
 
+                if results_errors.ndim == 4:
+                    results_errors = results_errors.reshape(-1, 3)
                 if results_errors.ndim == 3:
                     assert(results_errors.shape[1] == results_errors.shape[2] == 3)
                     diag = [
@@ -129,7 +134,7 @@ if __name__ == "__main__":
                 do_jet_cmp = False
                 do_classifications = False
 
-                # raise e
+                raise e
             
             try:
                 assert(do_classifications)

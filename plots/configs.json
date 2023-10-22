@@ -1,93 +1,50 @@
 {
-    "results_dir": "../../comparisons/section5_ndive",
+    "results_dir": "../../comparisons/section5_results_v2",
      "models": [
         "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
-        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive",
-        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_none", 
-        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent"
+        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent",
+        "/sdf/scratch/r/rainacio/section5_enc_v2/gn2_random",
+        "/sdf/scratch/r/rainacio/section5_complete/gn2plus_v2"
     ],
     "labels_models": [
-        "GN2", 
-        "GN2+ Naive",
-        "GN2+ Vertex", 
-        "GN2+ Full"
-    ],   
-    "limits_bins_70_c": [
-        0,
-        1
-    ],
-    "limits_bins_70_c_ratio": [
-        0,
-        1
-    ],
-    "limits_bins_70_l": [
-        0,
-        1
-    ],
-    "limits_bins_70_l_ratio": [
-        0,
-        1
-    ],
-    "limits_bins_85_c": [
-        0,
-        1
-    ],
-    "limits_bins_85_c_ratio": [
-        0,
-        1
-    ],
-    "limits_bins_85_l": [
-        0,
-        1
-    ],
-    "limits_bins_85_l_ratio": [
-        0,
-        1
-    ],
-    
-    "results_dir_final": "../../comparisons/section5_resuts",    
-    "results_dir_ndive": "../../comparisons/section5_ndive",
-    "results_dir_enc": "../../comparisons/section5_enc",
-    "models_ndive": [
-        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
-        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive",
-        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_none", 
-        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent"
-    ],
-    "labels_models_ndive": [
-        "GN2", 
-        "GN2+ Naive",
-        "GN2+ Vertex", 
-        "GN2+ Full"
-    ],
-    "models_enc": [
-        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
-        "/sdf/scratch/r/rainacio/section5_enc/gn2_pt",
-        "/sdf/scratch/r/rainacio/section5_enc/gn2_random_fixed_v2",
-        "/sdf/scratch/r/rainacio/section5_enc/gn2_simple_eye"
-
-    ],
-    "labels_models_enc": [
-        "GN2", 
-        "GN2+ Momenta",
-        "GN2+ Random", 
-        "GN2+ Eye"
-    ],
-    "models_final": [
-        "/sdf/scratch/r/rainacio/section5_baseline/gn2", 
-        "/sdf/scratch/r/rainacio/section5_ndive_v2/gn2_ndive_augm_independent",
-        "/sdf/scratch/r/rainacio/section5_enc/gn2_simple_eye",
-        "/sdf/scratch/r/rainacio/section5_complete/gn2plus"
-    ],
-    "labels_models_final": [
         "GN2", 
         "GN2+ No Enc",
         "GN2+ No Info", 
         "GN2+"
+    ],   
+    "limits_bins_70_c": [
+        1,
+        10
     ],
-    "models_dummy": [
-        "../../models_slac/gn2", "../../models_slac/gn2_ndive", "../../models_slac/gn2_ndive_augm_independent", "../../models/1410encs"
+    "limits_bins_70_c_ratio": [
+        0.95,
+        1.45
     ],
+    "limits_bins_70_l": [
+        0,
+        550
+    ],
+    "limits_bins_70_l_ratio": [
+        0.95,
+        2.5
+    ],
+    "limits_bins_85_c": [
+        1,
+        4
+    ],
+    "limits_bins_85_c_ratio": [
+        0.95,
+        1.45
+    ],
+    "limits_bins_85_l": [
+        0,
+        140
+    ],
+    "limits_bins_85_l_ratio": [
+        0.95,
+        3
+    ],
+    
     "labels_graph": [
         "b", "c", "l"
     ],
@@ -124,32 +81,5 @@
         "gold", 
         "dodgerblue"
     ],
-    "ground_truth": "../../ground_truth",
-    "ground_truth_rachel": "../../DifferentiableVertexingProject",
-    "ground_truth_original": ["../../ground_truth_1407", "ground_truth_2608"],
-    "ndive_path": [
-        "../../DifferentiableVertexingProject/models/ftag_wVertexFit_NDIVE/"
-    ],
-    "colors_atlas_pallete": [
-        "(213/255, 23/255, 78/255)",
-        "(0, 191/255, 1)",
-        "(102/255, 205/255, 170/255)",
-        "(1, 177/255, 109/255)",
-        "(221/255, 133/255, 215/255)"
-    ],
-    "colors_custom_pallete": [
-        "(240/255, 249/255, 232/255)",
-        "(186/255, 228/255, 188/255)",
-        "(123/255, 204/255, 196/255)",
-        "(67/255, 162/255, 202/255)",
-        "(8/255, 104/255, 172/255)"
-    ],
-    "colors_custom_pallete_2": [
-        "(255/255, 255/255, 204/255)",
-        "(161/255, 218/255, 180/255)",
-        "(65/255, 182/255, 196/255)",
-        "(44/255, 127/255, 184/255)",
-        "(37/255, 52/255, 148/255)" 
-    ]
-
+    "ground_truth": "../../ground_truth"
 }
