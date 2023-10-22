@@ -29,14 +29,13 @@ random.seed(seed)
 test_dl = torch.load("%s/test_dl.pth"%(DEFAULT_DIR))
 batch_size = 250
 
-preds = {
-    "relativity": [],
-    "regression": [],
-    "ndive":      [],
-   # "ndive_perf": []
-}
-true = []
 
+preds = {
+    "regression": np.load("../models_vtx_fitting/regression/results_0.npz")['results_graph_reg'],
+    "ndive":      np.load("../models_vtx_fitting/ndive/results_0.npz")['results_graph_reg'],
+}
+true = np.load("../ground_truth_final/jet_vtx.npy")
+flavours = np.load("../ground_truth_final/jet_y.npy")
 def relativity(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta):
         jet_pt = x[:, 0, daf.JetData.TRACK_JET_PT]
         jet_eta = x[:, 0, daf.JetData.TRACK_JET_ETA]
@@ -62,61 +61,8 @@ def relativity(x, mask, true_jet, true_trk, n_tracks, jet_phi, jet_theta):
         return points
 
 
-with open(f"../models_ndive_section_potential/regression/params_0.pickle", 'rb') as fp:
-    params_reg = pickle.load(fp)
-with open(f"../models_ndive_section_potential/regression/config_0.json", 'r') as fp:
-    settings = json.load(fp)
-regression = Predictor(**settings)
-
-with open(f"../models_ndive_section_potential/ndive/params_0.pickle", 'rb') as fp:
-    params_ndive = pickle.load(fp)
-with open(f"../models_ndive_section_potential/ndive/config_0.json", 'r') as fp:
-    settings = json.load(fp)
-ndive = Predictor(**settings)
-
-with open(f"../models_ndive_section_potential/ndive_perfect/config_0.json", 'r') as fp:
-    settings = json.load(fp)
-ndive_perf = Predictor(**settings)
-
-def test_step(params, model, batch):
-    mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
-    return model.apply(
-        {'params': params}, 
-        batch['x'], 
-        mask, 
-        batch['jet_vtx'], 
-        batch['trk_vtx'],
-        batch['n_tracks'],
-        batch['jet_phi'],
-        batch['jet_theta'],
-    )[3]
-
-for i, dd in enumerate(test_dl):
-    for j in range(dd.x.shape[0] // batch_size):
-        x = dd.x[batch_size*j:batch_size*(j+1), :, :]
-        y = dd.y[batch_size*j:batch_size*(j+1), :, :]
-
-        x = jnp.array(x)
-        y = jnp.array(y)
-
-        n_jets, n_tracks, _ = x.shape
-
-        batch = get_batch(x, y, 0)
-        mask, mask_edges = mask_tracks(batch['x'], batch['n_tracks'])
-
-        true.append(batch['jet_vtx'])
-        preds['relativity'].append(relativity(batch['x'], mask, batch['jet_vtx'], batch['trk_vtx'], batch['n_tracks'], batch['jet_phi'], batch['jet_theta']))
-        preds['regression'].append( test_step(params_reg, regression, batch))
-        preds['ndive'].append(test_step(params_ndive, ndive, batch))
-        #preds['ndive_perf'].append(test_step(params_ndive, ndive_perf, batch))
-
-
-
-
-true = jnp.array(true)
 true = true.reshape(-1, 3)
 for k in preds.keys():
-    preds[k] = jnp.array(preds[k])
     preds[k] = preds[k].reshape(-1, 3)
 
 labels = {
@@ -130,16 +76,87 @@ font = {'family' : 'sans-serif',
         'size'   : 22}
 plt.rc('font', **font)
 
-lim1 = -50
-lim2 =  50
-nbins = 200
-fig = plt.figure(figsize=(10, 10))
-ax = fig.add_subplot(111)
-plt.hist(true[:, 0], bins=np.linspace(lim1,lim2,nbins),histtype='step', label="True", lw=3)
-for k in preds.keys():
-    plt.hist(preds[k][:, 0], bins=np.linspace(lim1,lim2,nbins),histtype='step', label=labels[k], lw=3)
+# lim1 =  -50
+# lim2 =  50
+# nbins = 200
+# fig = plt.figure(figsize=(10, 10))
+# ax = fig.add_subplot(111)
 
-ax.set_yscale('log')
-plt.legend()
-plt.savefig("preds_test.pdf")
-plt.close()
+# plt.hist(true[:, 0], bins=np.linspace(lim1,lim2,nbins),histtype='step', label="True", lw=3)
+# for k in preds.keys():
+#     # res = np.sqrt(np.sum(np.square(preds[k] - true), axis=1))
+#     plt.hist(preds[k][:, 0], bins=np.linspace(lim1,lim2,nbins),histtype='step', label=labels[k], lw=3)
+
+# ax.set_yscale('log')
+# plt.legend()
+# plt.savefig("preds_test2.pdf")
+# plt.close()
+
+
+from matplotlib import colors
+
+bjet_color= "white" #"#c7fce7".upper() #"#009988"
+cjet_color= "white" #"#faffd1".upper() # "#33BBEE"
+ujet_color= "#22dcf5".upper() # "#EE3377"
+
+def make_2dhist_vertex_prediction(x_ax, y_ax, z_ax, outputs, inputs, flavor):
+    """ Create 2d histogram of predicted coordinate vs true coordinate for x, y, and z."""
+
+    bins = [50,50]
+    range = [[-50, 50], [-50, 50]]
+    
+    h_x, h_y, h_z = None, None, None
+    norm=colors.LogNorm(vmin=10e-6, vmax=1)
+    #cmap=colors.LinearSegmentedColormap.from_list("", [ujet_color,cjet_color])
+    # cmap='autumn'
+    # cmap=colors.LinearSegmentedColormap.from_list("", ['#101f47'.upper(),ujet_color,'whitesmoke'])
+    cmap=colors.LinearSegmentedColormap.from_list("", ['#111A44',ujet_color,'whitesmoke'])
+    if x_ax is not None: 
+        h_x = x_ax.hist2d(inputs[:, 0], outputs[:, 0], bins=bins, range=range, norm=norm, cmap=cmap, density=True)
+    if y_ax is not None: 
+        h_y = y_ax.hist2d(inputs[:, 1], output[:, 1], bins=bins, range=range, norm=norm, cmap=cmap, density=True)
+    if z_ax is not None: 
+        h_z = z_ax.hist2d(inputs[:, 2], outputs[:, 2], bins=bins, range=range, norm=norm, cmap=cmap, density=True)
+
+    for ax, dim in zip([x_ax, y_ax, z_ax], ['X', 'Y', 'Z']):
+        if ax is None: continue
+        ax.set_xlabel(f'${dim}_{{true}}$ [mm]')#, fontsize = 14)
+        ax.set_ylabel(f'${dim}_{{pred}}$ [mm]')#, fontsize = 14)
+
+    return h_x, h_y, h_z
+
+
+# Filter
+cond = flavours < 2
+true = true[cond]
+for k in preds:
+    preds[k] = preds[k][cond]
+
+fig, axs = plt.subplots(2, 2, figsize=(12,10), dpi=100, constrained_layout=True)
+hxb, _, hzb = make_2dhist_vertex_prediction(axs[0][0], None, axs[0][1], true, preds['ndive'],"n")
+hxc, _, hzc = make_2dhist_vertex_prediction(axs[1][0], None, axs[1][1], true, preds['regression'],"r")
+axs[0][0].text(-48, 40, 'NDIVE')
+axs[0][1].text(-48, 40, 'NDIVE')
+axs[1][0].text(-48, 40, 'Regression')
+axs[1][1].text(-48, 40, 'Regression')
+axs[0][0].set_facecolor(bjet_color)
+axs[0][0].patch.set_alpha(0.25)
+axs[0][1].set_facecolor(bjet_color)
+axs[0][1].patch.set_alpha(0.25)
+axs[1][0].set_facecolor(cjet_color)
+axs[1][0].patch.set_alpha(0.25)
+axs[1][1].set_facecolor(cjet_color)
+axs[1][1].patch.set_alpha(0.25)
+axs[0][0].set_xticks([-50,0,50])
+axs[0][1].set_xticks([-50,0,50])
+axs[1][0].set_xticks([-50,0,50])
+axs[1][1].set_xticks([-50,0,50])
+axs[0][0].set_yticks([-50,0,50])
+axs[0][1].set_yticks([-50,0,50])
+axs[1][0].set_yticks([-50,0,50])
+axs[1][1].set_yticks([-50,0,50])
+fig.colorbar(hxb[3], ax=axs.ravel().tolist())
+#fig.colorbar(hxb[3], ax=axs[0][1])
+#fig.colorbar(hxc[3], ax=axs[1][1])
+#fig.tight_layout()
+plt.savefig("ndive_vs_regression_3.pdf")
